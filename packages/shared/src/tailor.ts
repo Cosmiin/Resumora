@@ -123,6 +123,10 @@ export const QuestionSchema = z.object({
   skill: z.string().optional(),
   /** "all": asked once for every role (a tool or practice the CV misses), before the first role's own questions. */
   scope: z.literal("all").optional(),
+  /** An all-roles question: the roles whose own lines hint at it, likeliest first. Shown first, never ticked for the person. */
+  suggestedRoleIds: z.array(z.string()).optional(),
+  /** The words of those roles' lines that hint at it, copied from the CV. */
+  hint: z.string().optional(),
 });
 export type Question = z.infer<typeof QuestionSchema>;
 

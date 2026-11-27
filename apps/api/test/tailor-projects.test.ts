@@ -101,7 +101,7 @@ describe("Projects & volunteering step", () => {
     await repo.updateRun(run.id, { currentSection: "projects", currentRoleId: item.id, questions,
       answers: questions.map((q) => ({ questionId: q.id, value: `Work at ${q.roleId}`, via: "typed" as const })),
     });
-    await runItem(run.id, "projects", item.id, reword(item.bullets[0]!.id, item.bullets[0]!.text));
+    await runItem(run.id, "projects", item.id, reword(item.bullets[0]!.id, `${item.bullets[0]!.text} every week`));
     const sent = lastUser("items") as { items: { edit: { id: string }[] }; answers: { question: string; answer: string }[]; steering: string };
     expect(sent.items).toEqual({ edit: [expect.objectContaining({ id: item.id })] });
     expect(sent.answers).toEqual([{ question: `What did you do at ${item.company}?`, answer: `Work at ${item.id}` }]);

@@ -47,6 +47,20 @@ export async function runLayoutPass(
   if (run.status === "done" || run.currentSection !== "layout") {
     throw new ApiError(409, "section_not_current", "This section isn't the current step.");
   }
+  const proposals = await layoutProposals(deps, input);
+  await deps.tailor.updateRun(run.id, {
+    status: "waiting_user",
+    proposals: [...(run.proposals ?? []).filter((p) => !LAYOUT_ITEMS.includes(p.itemId)), ...proposals],
+  });
+  return { proposals, questions: [] };
+}
+
+/** The layout step's proposals from the tailored CV as it stands, without touching the run. */
+export async function layoutProposals(
+  deps: { model: ModelDeps; tailor: TailorRepo },
+  input: { userId: string; run: TailorRun; job: JobExtraction },
+): Promise<Proposal[]> {
+  const { run } = input;
   const doc = run.tailoredCvId ? await deps.tailor.getTailoredCv(run.tailoredCvId) : null;
   if (!doc) throw jobNotFound();
   const cv = stripHeader(doc.content).cv;
@@ -79,9 +93,5 @@ export async function runLayoutPass(
     proposals.push({ itemId: "headline", field: "title", text, inferred: false, flags: [] });
   }
 
-  await deps.tailor.updateRun(run.id, {
-    status: "waiting_user",
-    proposals: [...(run.proposals ?? []).filter((p) => !LAYOUT_ITEMS.includes(p.itemId)), ...proposals],
-  });
-  return { proposals, questions: [] };
+  return proposals;
 }

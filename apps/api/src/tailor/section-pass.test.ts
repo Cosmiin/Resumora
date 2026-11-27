@@ -37,9 +37,9 @@ describe("a project's section pass", () => {
     const cv = { ...emptyCv("en"), projects: [project] };
     const { tailor, run } = await setUp(cv, project.id);
     const proposals = [
-      reword(project.bullets[0]!.id, "text", "Built agents with the Claude API."),
-      reword(project.bullets[1]!.id, "text", "Wrote the tests."),
-      reword(project.bullets[2]!.id, "text", "Shipped it."),
+      reword(project.bullets[0]!.id, "text", "Built agents with the Claude API, with tests."),
+      reword(project.bullets[1]!.id, "text", "Wrote the tests for the agents."),
+      reword(project.bullets[2]!.id, "text", "Shipped it with tests."),
       reword(project.id, "description", "Built agents with the Claude API."),
     ];
     const replies = [{ proposals }, { results: [] }];
@@ -54,11 +54,30 @@ describe("a project's section pass", () => {
     const helper = roleWith(["Sorted parcels.", "Led a team.", "Trained new helpers."], { current: true, endDate: "" });
     const cv = { ...emptyCv("en"), volunteering: [helper] };
     const { tailor, run } = await setUp(cv, helper.id);
-    const proposals = helper.bullets.map((b) => reword(b.id, "text", b.text));
+    const proposals = helper.bullets.map((b) => reword(b.id, "text", b.text.replace(".", " every week.")));
     const replies = [{ proposals }, { results: [] }];
     const model = fakeModel(() => replies.shift());
     const result = await passProposals({ model: model.deps, tailor }, { userId: "user-a", run, job, cv, section: "projects", roleId: helper.id });
     expect(result.proposals.filter((p) => p.field === "text")).toHaveLength(3);
+  });
+
+  it("a proposal that repeats the line's own wording is no change: it is not returned", async () => {
+    const helper = roleWith(["Sorted parcels.", "Led a team."], { current: true, endDate: "" });
+    const cv = { ...emptyCv("en"), volunteering: [helper], technicalSkills: [{ id: "s1", name: "Excel" }] };
+    const { tailor, run } = await setUp(cv, helper.id);
+    // The model often sends a line back as it is (to say where it stands in the order): that is not a rewording.
+    let replies: unknown[] = [{ proposals: [reword(helper.bullets[0]!.id, "text", "Sorted parcels."), reword(helper.bullets[1]!.id, "text", " Led a team. "),
+      reword(helper.id, "description", "Payroll for 40 staff, every week.")] }, { results: [] }];
+    let model = fakeModel(() => replies.shift());
+    const result = await passProposals({ model: model.deps, tailor }, { userId: "user-a", run, job, cv, section: "projects", roleId: helper.id });
+    expect(result.proposals.map((p) => p.itemId)).toEqual([helper.id]);
+
+    replies = [{ proposals: [reword("s1", "name", "Excel")] }];
+    model = fakeModel(() => replies.shift());
+    const skills = await passProposals({ model: model.deps, tailor }, { userId: "user-a", run: { ...run, currentSection: "skills" }, job, cv, section: "skills", roleId: null });
+    expect(skills.proposals).toEqual([]);
+    // Nothing left to check, so the verifier is not called.
+    expect(model.requests).toHaveLength(1);
   });
 });
 

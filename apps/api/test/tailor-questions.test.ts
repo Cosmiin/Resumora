@@ -604,3 +604,92 @@ describe("questions for every role at once", () => {
   });
 
 });
+
+describe("gap questions: every gap asked once, with the roles it may fit", () => {
+  type Row = { text: string; skill: string; reason: string; gap: string; roleIds: string[]; hint: string | null };
+  const row = (skill: string, over: Partial<Row> = {}): Row =>
+    ({ text: `Did you use ${skill}?`, skill, reason: "Gap", gap: "r0", roleIds: [], hint: null, ...over });
+  const gaps = async (runId: string) => {
+    const res = await call(`/v1/tailor-runs/${runId}/gap-questions`);
+    expect(res.status).toBe(200);
+    return (await res.json() as { questions: Question[] }).questions;
+  };
+  const reply = (...rows: Row[]) => { replies = [rows as unknown as ModelQuestion[]]; };
+
+  it("asks every open gap once, with the roles whose own lines hint at it", async () => {
+    const runId = await startRun();
+    reply(row("Kubernetes"), row("Team lead", { gap: "r1", roleIds: [newest.id, "no-such-role"], hint: "Led 3 people" }), row("Docker", { gap: "nope" }));
+    const asked = await gaps(runId);
+    expect(asked).toEqual([
+      expect.objectContaining({ text: "Did you use Kubernetes?", skill: "Kubernetes", gap: "r0", scope: "all", kind: "skill", roleId: null }),
+      expect.objectContaining({ skill: "Team lead", gap: "r1", scope: "all", suggestedRoleIds: [newest.id], hint: "Led 3 people" }),
+    ]);
+    expect(asked[0]).not.toHaveProperty("suggestedRoleIds");
+    expect(asked[0]).not.toHaveProperty("hint");
+    const sent = JSON.parse((model.requests[0]!.messages as { content: string }[])[1]!.content);
+    expect(sent.gaps.map((gap: { ref: string }) => gap.ref)).toEqual(["r0", "r1"]);
+    expect(sent.roles).toEqual([
+      expect.objectContaining({ id: newest.id, lines: expect.arrayContaining(["Led 3 people"]) }),
+      expect.objectContaining({ id: older.id, lines: expect.arrayContaining(["Ran payroll"]) }),
+    ]);
+
+    // Asked once per run: the same questions come back, with no second model call.
+    expect(await gaps(runId)).toEqual(asked);
+    expect(model.requests).toHaveLength(1);
+    // The older all-roles route has nothing more to ask.
+    expect(await (await call(`/v1/tailor-runs/${runId}/across-questions`)).json()).toEqual({ questions: [] });
+    expect(model.requests).toHaveLength(1);
+  });
+
+  it("drops a hint that is not in the suggested role's own words, with its suggestion", async () => {
+    const runId = await startRun();
+    reply(row("Team lead", { gap: "r1", roleIds: [older.id], hint: "Led 3 people" }), row("Kubernetes", { roleIds: [newest.id], hint: "Managed a squad" }));
+    const asked = await gaps(runId);
+    expect(asked.map((q) => q.skill)).toEqual(["Team lead", "Kubernetes"]);
+    for (const question of asked) {
+      expect(question).not.toHaveProperty("suggestedRoleIds");
+      expect(question).not.toHaveProperty("hint");
+    }
+  });
+
+  it("asks a CV with one role too, and nothing when the CV shows everything", async () => {
+    await cv.save({ ...base, experience: [newest] }, 1);
+    const runId = await startRun();
+    reply(row("Kubernetes"));
+    expect((await gaps(runId)).map((q) => q.skill)).toEqual(["Kubernetes"]);
+
+    await memoryTailorRepo("user-a", scores).saveScore(jobId, "base", null,
+      { ...score, labels: score.labels.map((label) => ({ ...label, status: "met" as const, inferred: false, evidence: "Led 3 people" })) });
+    const other = await startRun();
+    await memoryTailorRepo("user-a", scores, docs).updateRun(other, { questions: [] });
+    const calls = model.requests.length;
+    expect(await gaps(other)).toEqual([]);
+    expect(model.requests).toHaveLength(calls);
+  });
+
+  it("notes each ticked role, and takes 12 answers in one request", async () => {
+    const runId = await startRun();
+    reply(row("Kubernetes"), row("Team lead", { gap: "r1" }));
+    const [k8s, lead] = await gaps(runId);
+    const res = await call(`/v1/tailor-runs/${runId}/answers`, { answers: [
+      { questionId: k8s!.id, value: "No", via: "option", use: "similar" },
+      { questionId: lead!.id, value: "Yes", via: "option", use: "used", roleIds: [newest.id] },
+    ] });
+    expect(res.status).toBe(200);
+    expect(await jobNotes()).toEqual([expect.objectContaining({ roleId: newest.id, answer: "Used Team lead" })]);
+
+    const many: Question[] = Array.from({ length: 12 }, (_, i) => ({ id: `g${i}`, section: "experience", roleId: null, text: `Did you use tool ${i}?`,
+      kind: "skill", options: [], reason: "Gap", gap: `k:tool ${i}`, scope: "all", skill: `Tool ${i}` }));
+    await memoryTailorRepo("user-a", scores, docs).updateRun(runId, { questions: many });
+    const all = await call(`/v1/tailor-runs/${runId}/answers`, { answers: many.map((q) => ({ questionId: q.id, value: "No", via: "option", use: "none" })) });
+    expect(all.status).toBe(200);
+  });
+});
+
+describe("the gap questions prompt", () => {
+  it("asks only what ticking roles can answer", async () => {
+    const { gapSystemPrompt } = await import("../src/tailor/question-prompts.ts");
+    expect(gapSystemPrompt).toContain('Start it with "Did you" or "Have you"');
+    expect(gapSystemPrompt).toContain('never with "Which", "What" or "How"');
+  });
+});

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   applyGuesses, CvContentSchema, findScored, isLightTailorSection, isRoleSection, MAX_ITEMS, MAX_LONG_TEXT, MAX_TEXT, NoteSchema, newId, scoredItems, stepOrder, withoutHidden,
-  type CvContent, type Job, type JobExtraction, type MatchLabel, type MatchScore, type Note, type Proposal, type SectionKey, type TailorRun, type TailorSection,
+  type CvContent, type Job, type JobExtraction, type MatchLabel, type MatchScore, type Note, type Proposal, type SectionKey, type TailoredCv, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
@@ -147,8 +147,54 @@ export async function acceptSection(
   const doc = run.tailoredCvId ? await deps.tailor.readTailoredCv(run.tailoredCvId) : null;
   if (!doc) throw jobNotFound();
 
+  const { content, review, notes } = await mergeStep(deps, {
+    run, job: input.job.extracted, section, roleId, body, doc, proposals: run.proposals ?? [], fromBase: !!input.redo,
+  });
+  const score = await scoreTailored(deps, {
+    userId: input.userId, cv: { id: doc.id, jobId: run.jobId, content, review, score: doc.score }, job: input.job.extracted,
+  });
+  if (await deps.tailor.saveTailoredCv(doc.id, doc.version, { content, review, score }) === "conflict") {
+    throw new ApiError(409, "version_conflict", "This tailored CV was saved somewhere else first.");
+  }
+  await deps.tailor.saveScore(run.jobId, "tailored", doc.id, score);
+
+  if (notes.length > 0) {
+    const base = (await deps.cv.get()).content;
+    const roleIds = new Set(scoredItems(base).map(({ item }) => item.id));
+    const fallback = newestRole(base.experience)?.id;
+    const byRole = new Map<string, Note[]>();
+    for (const { roleId, note } of notes) {
+      const target = roleId && roleIds.has(roleId) ? roleId : fallback;
+      if (target) byRole.set(target, [...(byRole.get(target) ?? []), note]);
+    }
+    for (const [roleId, list] of byRole) await deps.cv.addJobNotes(roleId, list);
+  }
+
+  if (input.redo) return { run, score };
+  // The step's next item in CV order, then the next section after its last item (a role step starts on its first item).
+  const order = roleId ? stepOrder(run, content, section) : [];
+  const nextRole = roleId ? order[order.indexOf(roleId) + 1] ?? null : null;
+  const next = nextRole ? section : run.sections[run.sections.indexOf(section) + 1] ?? null;
+  const currentRoleId = nextRole ?? (isRoleSection(next) ? stepOrder(run, content, next)[0] ?? null : null);
+  const updated = await deps.tailor.updateRun(run.id, {
+    currentSection: next, status: next ? "running" : "done", ...(roleId || isRoleSection(next) ? { currentRoleId } : {}),
+  });
+  if (!updated) throw jobNotFound();
+  return { run: updated, score };
+}
+
+/**
+ * One step's proposals written into a copy of the tailored CV, with the step's review state: kept unless flagged (or
+ * as the person chose), a change that drops met evidence left out. Saves nothing: the caller scores and saves.
+ * `fromBase`: a role, project or volunteering role starts again from its Base wording (a redo, or a step written again).
+ */
+export async function mergeStep(
+  deps: { tailor: TailorRepo; cv: CvRepo; now(): Date },
+  input: { run: TailorRun; job: JobExtraction; section: TailorSection; roleId: string | null; body: AcceptBody; doc: TailoredCv; proposals: Proposal[]; fromBase: boolean },
+): Promise<{ content: CvContent; review: Review; notes: { roleId: string | null; note: Note }[]; changed: number }> {
+  const { run, section, roleId, body, doc } = input;
   const content = structuredClone(doc.content);
-  if (input.redo && roleId) {
+  if (input.fromBase && roleId) {
     // The redone proposals replace the role's earlier ones: start again from its Base wording.
     const baseRole = findScored((await deps.cv.get()).content, roleId)?.item;
     for (const list of [content.experience, content.projects, content.volunteering] as CvContent["experience"][]) {
@@ -173,7 +219,7 @@ export async function acceptSection(
   const state: Record<string, ItemReview> = {};
   const notes: { roleId: string | null; note: Note }[] = [];
   const kept: { key: string; applied: Proposal }[] = [];
-  for (const p of (run.proposals ?? []).filter((proposal) => ids.has(proposal.itemId))) {
+  for (const p of input.proposals.filter((proposal) => ids.has(proposal.itemId))) {
     const key = reviewKey(p);
     let keep: boolean | undefined;
     if (p.flags.length > 0) {
@@ -210,7 +256,7 @@ export async function acceptSection(
   }
   // A step must not end below where it started: a change that drops met evidence is left out, and its line keeps the
   // wording it had (shown as not kept).
-  const dropped = evidenceDropped(await previousLabels(deps, { id: doc.id, jobId: run.jobId, score: doc.score }, input.job.extracted),
+  const dropped = evidenceDropped(await previousLabels(deps, { id: doc.id, jobId: run.jobId, score: doc.score }, input.job),
     structuredClone(content), kept, section);
   for (const { key, applied } of kept) {
     if (dropped.has(key)) {
@@ -226,35 +272,5 @@ export async function acceptSection(
   const others = roleId ? Object.fromEntries(Object.entries((doc.review?.[section] ?? {}) as Record<string, ItemReview>)
     .filter(([key]) => !ids.has(key))) : {};
   const review: Review = { ...(doc.review ?? {}), [section]: { ...others, ...state } };
-  const score = await scoreTailored(deps, {
-    userId: input.userId, cv: { id: doc.id, jobId: run.jobId, content: parsed.data, review, score: doc.score }, job: input.job.extracted,
-  });
-  if (await deps.tailor.saveTailoredCv(doc.id, doc.version, { content: parsed.data, review, score }) === "conflict") {
-    throw new ApiError(409, "version_conflict", "This tailored CV was saved somewhere else first.");
-  }
-  await deps.tailor.saveScore(run.jobId, "tailored", doc.id, score);
-
-  if (notes.length > 0) {
-    const base = (await deps.cv.get()).content;
-    const roleIds = new Set(scoredItems(base).map(({ item }) => item.id));
-    const fallback = newestRole(base.experience)?.id;
-    const byRole = new Map<string, Note[]>();
-    for (const { roleId, note } of notes) {
-      const target = roleId && roleIds.has(roleId) ? roleId : fallback;
-      if (target) byRole.set(target, [...(byRole.get(target) ?? []), note]);
-    }
-    for (const [roleId, list] of byRole) await deps.cv.addJobNotes(roleId, list);
-  }
-
-  if (input.redo) return { run, score };
-  // The step's next item in CV order, then the next section after its last item (a role step starts on its first item).
-  const order = roleId ? stepOrder(run, parsed.data, section) : [];
-  const nextRole = roleId ? order[order.indexOf(roleId) + 1] ?? null : null;
-  const next = nextRole ? section : run.sections[run.sections.indexOf(section) + 1] ?? null;
-  const currentRoleId = nextRole ?? (isRoleSection(next) ? stepOrder(run, parsed.data, next)[0] ?? null : null);
-  const updated = await deps.tailor.updateRun(run.id, {
-    currentSection: next, status: next ? "running" : "done", ...(roleId || isRoleSection(next) ? { currentRoleId } : {}),
-  });
-  if (!updated) throw jobNotFound();
-  return { run: updated, score };
+  return { content: parsed.data, review, notes, changed: kept.length - dropped.size };
 }

@@ -253,6 +253,9 @@ export async function passProposals(
     for (const { reason, guesses, ...p } of reply.proposals) {
       const fields = Object.keys(items.get(p.itemId)?.fields ?? {});
       const field = fields.includes(p.field) ? p.field : fields.length === 1 ? fields[0]! : null;
+      // The wording a line already has is no change (27 Nov: 6 of 7 role "changes" in a trial were lines sent back as
+      // they stood, and would have shown as changed with the same text before and after).
+      if (field && p.itemId !== "new-skill" && !notText({ field }) && (items.get(p.itemId)!.fields[field] ?? "").trim() === p.text.trim()) continue;
       // A guess or a new skill keeps the reason naming its basis; a plain rewording has none.
       const used = p.itemId === "new-skill" ? usedIn.get(p.text.trim().toLowerCase()) : undefined;
       const why = used ? { reason: used } : (p.inferred || p.itemId === "new-skill") && reason?.trim() ? { reason: reason.trim() } : {};
