@@ -190,6 +190,8 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
 
   return (
     <div className={plain ? "answer-box is-plain" : "answer-box"}>
+      {/* The rule for the options, read before them (owner, 27 Nov 2026: it was small grey text under the box). */}
+      {question.options.length > 0 && <p className="answer-rule">{t("enrich.answer.optionsHint")}</p>}
       {!plain && question.options.length > 0 && <div className="answer-opts" role="group" aria-label={t("enrich.answer.options")}>
         {question.options.map((o, i) => (
           <button
@@ -233,7 +235,6 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
           {message}
         </p>
       )}
-      {question.options.length > 0 && <p className="fine">{t("enrich.answer.optionsHint")}</p>}
     </div>
   );
 }

@@ -69,7 +69,8 @@ function changesFor(card: Card, decisions: ReadonlyMap<string, Decision>, keepOr
 /**
  * The path's Shape step (score/9): for each role, the lines that describe the same work, merged into one if the person
  * agrees (Merge / Edit / Keep separate, or Merge all), and the line with the clearest result moved to the top unless
- * they keep the order. Nothing is changed here: `onDone` gets each role's change list.
+ * they keep the order. With no merge anywhere the screen is not shown: the moves are handed on as they are. Nothing is
+ * changed here: `onDone` gets each role's change list.
  */
 export function ShapeStep({ cv, scores, onDone }: { cv: CvContent; scores: Map<string, RoleScoreState>; onDone(changes: ShapeDone): void }) {
   const [cards, setCards] = useState<Card[] | null>(null);
@@ -105,10 +106,13 @@ export function ShapeStep({ cv, scores, onDone }: { cv: CvContent; scores: Map<s
   };
   // Nothing to merge or move anywhere: on to the next step.
   const empty = cards !== null && cards.length === 0;
+  // Nothing to merge, only a line to move to the top: that needs no screen (owner, 27 Nov 2026). The move is made.
+  const onlyMoves = cards !== null && cards.length > 0 && cards.every((c) => c.merges.length === 0);
   useEffect(() => {
     if (empty) finish([]);
+    else if (onlyMoves) finish(cards.map((card) => ({ roleId: card.role.id, changes: changesFor(card, new Map(), false) })).filter((r) => r.changes.length > 0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [empty]);
+  }, [empty, onlyMoves]);
 
   const set = (key: string, change: Partial<Decision>) =>
     setDecisions((all) => new Map(all).set(key, { ...all.get(key)!, ...change }));
@@ -134,7 +138,7 @@ export function ShapeStep({ cv, scores, onDone }: { cv: CvContent; scores: Map<s
       <h2 className="rr-big" id="fm-step-title" tabIndex={-1}>{t("enrich.path.shape.title")}</h2>
       <p className="rr-lead">{t("enrich.path.shape.lead")}</p>
       {cards === null && <p className="fm-note" role="status">{t("enrich.path.shape.loading")}</p>}
-      {cards !== null && (
+      {cards !== null && !onlyMoves && (
         <div className="ep-rows">
           {cards.map((card) => {
             const titleId = `sh-role-${card.role.id}`;

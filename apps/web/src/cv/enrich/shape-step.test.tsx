@@ -111,12 +111,20 @@ describe("ShapeStep", () => {
     expect(api.proposeShape).not.toHaveBeenCalled();
   });
 
+  it("with nothing to merge, the screen asks nothing: the strongest line is moved without a click", async () => {
+    api.proposeShape.mockResolvedValue({ merges: [] });
+    const onDone = renderStep();
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith([{ roleId: "r1", changes: [{ id: "order", kind: "order", ids: ["r1b5"] }] }]));
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Moved to the top:")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Keep order" })).toBeNull();
+  });
+
   it("a role whose Shape call fails still gets its strongest line moved", async () => {
     api.proposeShape.mockRejectedValue(new Error("down"));
     const onDone = renderStep();
-    expect(await screen.findByText("Moved to the top:")).toBeInTheDocument();
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("group", { name: /describe the same work/ })).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(onDone).toHaveBeenCalledWith([{ roleId: "r1", changes: [{ id: "order", kind: "order", ids: ["r1b5"] }] }]);
   });
 });
