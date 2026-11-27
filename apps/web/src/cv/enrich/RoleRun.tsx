@@ -244,8 +244,10 @@ function Working({ text }: { text: string }) {
 }
 
 /** One question of the run: the line it is about (when it is about one), the likely answers, your own words, the reason. */
-export function RunQuestion({ item, line, why, initial, locale, busy, onSubmit, onSkip, onBack }: {
+export function RunQuestion({ item, line, why, initial, locale, busy, submitLabel, onSubmit, onSkip, onBack }: {
   item: Exclude<RunItem, { kind: "box" }>; line?: string; why: string | null; initial: string; locale: Locale; busy: boolean;
+  /** What the answer button says when it does not lead to this role's next question (the path: "Next role", "Continue"). */
+  submitLabel?: string;
   onSubmit(text: string, via: Via[]): void; onSkip(): void; onBack?(): void;
 }) {
   const [value, setValue] = useState(initial);
@@ -292,7 +294,7 @@ export function RunQuestion({ item, line, why, initial, locale, busy, onSubmit, 
       <div className="fm-foot">
         <BackButton onBack={onBack} busy={busy} />
         <button type="button" className="fm-ghost" onClick={onSkip} disabled={busy}>{t("enrich.focus.skip")}</button>
-        {editing && <button type="button" className="fm-btn" disabled={busy || voiceBusy || answer === ""} onClick={() => onSubmit(answer, via)}>{t("enrich.focus.improve")}</button>}
+        {editing && <button type="button" className="fm-btn" disabled={busy || voiceBusy || answer === ""} onClick={() => onSubmit(answer, via)}>{submitLabel ?? t("enrich.focus.improve")}</button>}
       </div>
     </>
   );
