@@ -13,6 +13,8 @@ type Props = {
   onAnswer(item: BudgetItem, text: string, via: Via[]): void;
   /** "Rather just talk?": one free answer for the role on screen. */
   onTalk(roleId: string, text: string, via: Via[]): void;
+  /** The person moved on from a role's questions to the next role's: that role is then prepared, and Back no longer opens it. */
+  onRoleDone?(roleId: string): void;
   onDone(): void;
 };
 
@@ -25,7 +27,7 @@ const runItem = (item: BudgetItem, index: number): Exclude<RunItem, { kind: "box
  * and the answer) and the next fades in under it, so only one question is open at a time. The line a question is about
  * shows with it. "Rather just talk?" takes the role's answer in one box and skips that role's other questions.
  */
-export function BudgetStep({ cv, items, onAnswer, onTalk, onDone }: Props) {
+export function BudgetStep({ cv, items, onAnswer, onTalk, onRoleDone, onDone }: Props) {
   const [index, setIndex] = useState(0);
   /** What was done with each question passed so far: its answer, or null when it was skipped. */
   const [answers, setAnswers] = useState<Record<number, string | null>>({});
@@ -50,14 +52,12 @@ export function BudgetStep({ cv, items, onAnswer, onTalk, onDone }: Props) {
   };
   const next = (from: number, done: ReadonlySet<string>) => {
     const i = nextIndex(from, done);
-    if (i >= items.length) onDone();
-    else setIndex(i);
+    if (i >= items.length) return onDone();
+    if (items[i]!.roleId !== items[from]!.roleId) onRoleDone?.(items[from]!.roleId);
+    setIndex(i);
   };
-  const previous = (() => {
-    let i = index - 1;
-    while (i >= 0 && talked.has(items[i]!.roleId)) i--;
-    return i;
-  })();
+  // Back stays inside the role: a role the person moved on from is already being put on the CV.
+  const previous = index > 0 && items[index - 1]!.roleId === item.roleId ? index - 1 : -1;
   // The button says where it leads: the role's next question, the next role, or the end of the questions.
   const after = nextIndex(index, talked);
   const submitLabel = after >= items.length ? t("enrich.focus.continue") : items[after]!.roleId !== item.roleId ? t("enrich.path.budget.nextRole") : undefined;

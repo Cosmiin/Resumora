@@ -24,9 +24,10 @@ describe("BudgetStep", () => {
   const onAnswer = vi.fn();
   const onTalk = vi.fn();
   const onDone = vi.fn();
+  const onRoleDone = vi.fn();
   beforeEach(() => vi.resetAllMocks());
 
-  const open = () => render(<BudgetStep cv={cv} items={items} onAnswer={onAnswer} onTalk={onTalk} onDone={onDone} />);
+  const open = () => render(<BudgetStep cv={cv} items={items} onAnswer={onAnswer} onTalk={onTalk} onRoleDone={onRoleDone} onDone={onDone} />);
   const answer = async (text: string, button: string) => {
     await userEvent.type(screen.getByRole("textbox"), text);
     await userEvent.click(screen.getByRole("button", { name: button }));
@@ -66,6 +67,21 @@ describe("BudgetStep", () => {
     await answer("The board", "Continue");
     expect(onDone).toHaveBeenCalledTimes(1);
     expect(onAnswer).toHaveBeenCalledTimes(3);
+  });
+
+  it("says when the person leaves a role, and Back does not go into a role already left", async () => {
+    open();
+    await answer("Five", "Next");
+    expect(onRoleDone).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+    await answer("Sales doubled", "Next role");
+    expect(onRoleDone).toHaveBeenCalledTimes(1);
+    expect(onRoleDone).toHaveBeenCalledWith("r1");
+    expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+    // The last role is not "left": the end of the questions covers it.
+    await answer("The board", "Continue");
+    expect(onRoleDone).toHaveBeenCalledTimes(1);
+    expect(onDone).toHaveBeenCalledTimes(1);
   });
 
   it("a skipped question folds as skipped and saves nothing", async () => {

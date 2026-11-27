@@ -23,8 +23,13 @@ vi.mock("./ToolsStep.tsx", () => ({
   ),
 }));
 vi.mock("./BudgetStep.tsx", () => ({
-  BudgetStep: ({ items, onAnswer, onTalk, onDone }: { items: BudgetItem[]; onAnswer(i: BudgetItem, t: string, v: string[]): void; onTalk(r: string, t: string, v: string[]): void; onDone(): void }) => (
+  BudgetStep: ({ items, onAnswer, onTalk, onRoleDone, onDone }: { items: BudgetItem[]; onAnswer(i: BudgetItem, t: string, v: string[]): void; onTalk(r: string, t: string, v: string[]): void; onRoleDone?(r: string): void; onDone(): void }) => (
     <div>
+      <button type="button" onClick={() => {
+        const first = items[0]!.roleId;
+        for (const i of items) if (i.roleId === first) onAnswer(i, `Answer to ${i.question.text}`, ["type"]);
+        onRoleDone?.(first);
+      }}>Leave the first role</button>
       <p>Budget: {items.map((i) => i.question.text).join(" | ")}</p>
       <button type="button" onClick={() => { for (const i of items) onAnswer(i, `Answer to ${i.question.text}`, ["type"]); onDone(); }}>Answer all</button>
       <button type="button" onClick={() => { onAnswer(items[0]!, "First answer", ["type"]); onAnswer(items[0]!, "Corrected answer", ["type"]); }}>Answer twice</button>
@@ -458,6 +463,50 @@ describe("the short path", () => {
       expect(appliedTo(actions, "r1").map((c) => c.id)).toEqual(["description", "bullet:r1b1", "bullet:r1b2"]);
       expect(onScore.mock.calls.map(([r]) => r.roleId)).toEqual(["r2"]);
       expect(screen.queryByRole("alert")).toBeNull();
+    });
+  });
+
+  describe("preparing while the questions are answered", () => {
+    const toBudget = async (initial: Map<string, RoleScoreState>) => {
+      render(<Harness initial={initial} />);
+      await userEvent.click(screen.getByRole("button", { name: "Start" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Companies done" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+      await screen.findByText(/^Budget:/);
+    };
+    const checksFor = (roleId: string) => api.checkChanges.mock.calls.filter(([input]) => (input as { roleId: string }).roleId === roleId);
+
+    it("a role with no question is prepared as soon as the questions start, once", async () => {
+      // r2 has nothing to ask, only its weak line.
+      await toBudget(scores());
+      await waitFor(() => expect(checksFor("r2")).toHaveLength(1));
+      expect(checksFor("r1")).toHaveLength(0);
+      expect(screen.getByText(/^Budget:/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Answer all" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Rescore" }));
+      await screen.findByRole("heading", { name: /Your CV: 64 →/ });
+      expect(checksFor("r2")).toHaveLength(1);
+      expect(checksFor("r1")).toHaveLength(1);
+    });
+
+    it("a role is prepared when the person leaves its questions, with its answers, and not again at the end", async () => {
+      const actions: CvAction[] = [];
+      render(<Harness initial={new Map([["r1", ready(r1, 60)], ["r2", ready(r2, 70)]])} onAction={(a) => actions.push(a)} />);
+      await userEvent.click(screen.getByRole("button", { name: "Start" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Companies done" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+      await screen.findByText(/^Budget:/);
+      expect(api.checkChanges).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole("button", { name: "Leave the first role" }));
+      await waitFor(() => expect(checksFor("r1")).toHaveLength(1));
+      // Its changes are on the CV while the next role's questions are still on screen.
+      expect(screen.getByText(/^Budget:/)).toBeInTheDocument();
+      await waitFor(() => expect(appliedTo(actions, "r1").length).toBeGreaterThan(0));
+      expect(api.placeAnswersOnCv).toHaveBeenCalledWith(expect.objectContaining({ roleId: "r1", questions: expect.arrayContaining(["What changed in r1?"]) }));
+      expect(checksFor("r2")).toHaveLength(0);
+      await userEvent.click(screen.getByRole("button", { name: "Talk and finish" }));
+      await waitFor(() => expect(checksFor("r2")).toHaveLength(1));
+      expect(checksFor("r1")).toHaveLength(1);
     });
   });
 
