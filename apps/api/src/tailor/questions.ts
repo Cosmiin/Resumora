@@ -6,7 +6,7 @@ import {
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
-import { acrossSystemPrompt, acrossUserMessage, questionSystemPrompt, questionUserMessage } from "./question-prompts.ts";
+import { acrossSystemPrompt, acrossUserMessage, gapSystemPrompt, gapUserMessage, questionSystemPrompt, questionUserMessage } from "./question-prompts.ts";
 import { acrossNote, currentRole } from "./section-pass.ts";
 import type { TailorRepo } from "./repo.ts";
 import { steeringText } from "./steering.ts";
@@ -192,6 +192,69 @@ export async function askAcross(
     seen.add(question.gap);
     fresh.push({ id: newId(), section: "experience", roleId: null, text, kind: "skill", options: [], reason: question.reason, gap: question.gap,
       scope: "all", skill });
+  }
+  if (fresh.length > 0) await deps.tailor.updateRun(input.run.id, { questions: [...asked, ...fresh] });
+  return fresh;
+}
+
+/** Every gap is asked on one screen, before anything is written. */
+export const MAX_GAP_QUESTIONS = 12;
+const ModelGapQuestionsSchema = z.object({
+  questions: z.array(z.object({
+    text: z.string(), skill: z.string(), reason: z.string(), gap: z.string(),
+    /** The roles whose own lines hint at it, and the words that do. */
+    roleIds: z.array(z.string()), hint: z.string().nullable(),
+  })),
+});
+
+/**
+ * One question for every thing the job wants and the CV does not show (or only hints at), all asked on one screen
+ * before anything is written. Each is answered like an all-roles question (tick the roles, something similar, or
+ * neither), so the answers are saved the same way and no later step asks again. A question may come with the roles
+ * whose own lines hint at it and the words that do: kept only when those words really stand in that role.
+ * Asked once per run: afterwards the stored questions come back.
+ */
+export async function askGaps(
+  deps: { model: ModelDeps; tailor: TailorRepo },
+  input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; questionLanguage?: Locale },
+): Promise<Question[]> {
+  const asked = input.run.questions ?? [];
+  const stored = asked.filter((question) => question.scope === "all");
+  if (stored.length > 0) return stored;
+  const cv = stripHeader(input.cv).cv;
+  if (cv.experience.length === 0) return [];
+  const score = await deps.tailor.getScore(input.run.jobId, "base");
+  if (!score) return [];
+  const answered = new Set(asked.filter((question) => question.kind !== "flag" && question.gap).map((question) => question.gap));
+  const gaps = score.labels.filter((label) => (label.status !== "met" || label.inferred) && !answered.has(label.ref)
+    && (label.kind === "keyword" || ACROSS_CATEGORIES.has(input.job.requirements[Number(label.ref.slice(1))]?.category ?? "")));
+  if (gaps.length === 0) return [];
+  const gapRefs = new Set(gaps.map((label) => label.ref));
+  let reply: z.infer<typeof ModelGapQuestionsSchema>;
+  try {
+    reply = await callModel(deps.model, {
+      userId: input.userId, task: "tailor_questions", tier: "cheap", schema: ModelGapQuestionsSchema,
+      system: gapSystemPrompt,
+      user: gapUserMessage({ cv, job: input.job, gaps, answered: answeredForJob(input.cv, input.run, null), max: MAX_GAP_QUESTIONS,
+        questionLanguage: input.questionLanguage }),
+      maxOutputTokens: 4000,
+    });
+  } catch {
+    throw new ApiError(502, "ai_failed", "Couldn't tailor experience. Try again.");
+  }
+  const lines = new Map(cv.experience.map((role) => [role.id, [role.description, ...role.bullets.map((bullet) => bullet.text)]]));
+  const fresh: Question[] = [];
+  const seen = new Set<string>();
+  for (const question of reply.questions) {
+    const text = question.text.trim().slice(0, MAX_TEXT);
+    const skill = question.skill.trim().slice(0, MAX_TEXT);
+    if (!text || !skill || !gapRefs.has(question.gap) || seen.has(question.gap) || fresh.length >= MAX_GAP_QUESTIONS) continue;
+    seen.add(question.gap);
+    // A suggestion stands only on the role's own words: a hint that is not in a suggested role goes, with that role.
+    const hint = question.hint?.trim().slice(0, MAX_TEXT) ?? "";
+    const suggested = hint ? [...new Set(question.roleIds)].filter((id) => lines.get(id)?.some((line) => line.includes(hint))) : [];
+    fresh.push({ id: newId(), section: "experience", roleId: null, text, kind: "skill", options: [], reason: question.reason, gap: question.gap,
+      scope: "all", skill, ...(suggested.length > 0 ? { suggestedRoleIds: suggested, hint } : {}) });
   }
   if (fresh.length > 0) await deps.tailor.updateRun(input.run.id, { questions: [...asked, ...fresh] });
   return fresh;

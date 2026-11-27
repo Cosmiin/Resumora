@@ -9,7 +9,7 @@ import { ApiError, type LogFn } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
 import { AcceptBodySchema, acceptSection } from "./accept.ts";
 import { runLayoutPass } from "./layout-pass.ts";
-import { askAcross, askQuestions, MAX_RUN_QUESTIONS, saveAnswers } from "./questions.ts";
+import { askAcross, askGaps, askQuestions, MAX_GAP_QUESTIONS, MAX_RUN_QUESTIONS, saveAnswers } from "./questions.ts";
 import { finishedRole, RedoBodySchema, redoRole } from "./redo.ts";
 import type { TailorRepo } from "./repo.ts";
 import { restartWithSteering } from "./retailor.ts";
@@ -20,7 +20,7 @@ import { jobNotFound, startTailoring, tailorLanguages } from "./start.ts";
 import { toneExamples } from "./tone-examples.ts";
 import { finishRun, writeStep } from "./write-step.ts";
 
-const AnswersBodySchema = z.object({ answers: z.array(AnswerSchema).min(1).max(MAX_RUN_QUESTIONS) });
+const AnswersBodySchema = z.object({ answers: z.array(AnswerSchema).min(1).max(Math.max(MAX_RUN_QUESTIONS, MAX_GAP_QUESTIONS)) });
 const isUuid = (id: string) => z.uuid().safeParse(id).success;
 /** Experience steps name the role they are about. */
 const RoleBodySchema = z.object({ roleId: z.string().optional() });
@@ -120,6 +120,16 @@ export function tailorRoutes(deps: {
     const { run, job } = await stepRun(c);
     if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
     const questions = await askAcross({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, {
+      userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, questionLanguage: c.get("interfaceLanguage"),
+    });
+    return c.json({ questions });
+  });
+
+  // Every gap asked on one screen, before anything is written: one question each, with the roles it may fit.
+  app.post("/tailor-runs/:id/gap-questions", async (c) => {
+    const { run, job } = await stepRun(c);
+    if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
+    const questions = await askGaps({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, {
       userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, questionLanguage: c.get("interfaceLanguage"),
     });
     return c.json({ questions });

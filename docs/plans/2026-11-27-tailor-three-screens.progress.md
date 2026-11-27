@@ -16,3 +16,11 @@ open: none
 
 - Ruling: `finishRun` lives in `write-step.ts` beside `writeStep`, and its tests in `tailor-write-step.test.ts` (the plan first named `accept.ts` and a test file of its own); the plan's scope block was updated.
 - The review passed with one low finding, fixed before the commit: a step saved while the score was being worked out would have been marked as scored. Finish now checks the CV's version after scoring and answers 409 instead, leaving the run open.
+
+## Task A3: One request asks about every gap, with the roles it may fit — done
+session: Shorten the tailoring flow · builder: claude
+commit: see the log (base 41a61d3) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: none
+
+- Ruling: the note saved for a ticked role stays "Used <short name>", also for a practice that is not a tool. The plan's idea of another wording for those was dropped: it added a rule for no gain the trial could show.
+- The same requirement categories as the all-roles questions are asked (skill, experience, other); a missing degree, language or certificate is not a row, since no role can be ticked for it.

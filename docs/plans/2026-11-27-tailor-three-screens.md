@@ -44,15 +44,15 @@ size: ~40 lines
 
 ### Task A3: One request asks about every gap, with the roles it may fit
 ```
-files: apps/api/src/tailor/questions.ts, apps/api/src/tailor/question-prompts.ts, apps/api/src/tailor/section-pass.ts, apps/api/src/tailor/routes.ts, packages/shared/src/tailor.ts, apps/api/test/tailor-questions.test.ts
+files: apps/api/src/tailor/questions.ts, apps/api/src/tailor/question-prompts.ts, apps/api/src/tailor/routes.ts, packages/shared/src/tailor.ts, apps/api/test/tailor-questions.test.ts
 new_files: none
 deps: none
 size: ~90 lines
 ```
-**Goal.** `POST /v1/tailor-runs/:id/gap-questions`: one model call that returns one question per open gap (missing, partial or only hinted), asked once for all roles as today's all-roles questions are, at most 12, most useful first. New on each question: `suggestedRoleIds` (the roles whose own lines hint at it) and `hint` (the words of the CV that hint at it, quoted; checked to stand in that role). A gap no role could have had (a tool newer than every role) is left out. Stored on the run with scope "all", so the answers work as today (a note on each role ticked) and no later step asks again. A requirement that is not a tool is noted as "Confirmed for this role: <short name>" instead of "Used <name>".
+**Goal.** `POST /v1/tailor-runs/:id/gap-questions`: one model call that returns one question per open gap (missing, partial or only hinted), asked once for all roles as today's all-roles questions are, at most 12, most useful first. New on each question: `suggestedRoleIds` (the roles whose own lines hint at it) and `hint` (the words of the CV that hint at it, quoted; checked to stand in that role). A gap no role could have had (a tool newer than every role) is left out. Stored on the run with scope "all", so the answers work as today (a note on each role ticked) and no later step asks again. A CV with a single role is asked too. One answers request takes up to 12 answers.
 Asked once per run: a second call returns the stored questions.
 
-**Acceptance tests.** Every open gap gets a question, a met one none; a hint that is not in the suggested role's text is dropped with its suggestion; ids of roles the CV doesn't have are dropped; the second call makes no model call; a ticked role gets its note and the role step's message carries it; the old all-roles route still works.
+**Acceptance tests.** Every open gap gets a question, a met one none; a hint that is not in the suggested role's text is dropped with its suggestion; ids of roles the CV doesn't have are dropped; the second call returns the stored questions with no model call; a ticked role gets its note; a CV with one role is asked; 12 answers go through in one request; the old all-roles route still works.
 
 ## Part B: the site shows three screens
 
