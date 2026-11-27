@@ -178,6 +178,8 @@ export async function runPair(pair: Pair, model: (calls: AiCallLog[]) => ModelDe
     const jobId = crypto.randomUUID();
     await jobs.repoFor(userId).create({ id: jobId, source: "link", url: "https://example.test/job", urlNormalized: jobId, rawText: "eval", jsonLd: null });
     await jobs.admin.finish(jobId, pair.job);
+    // The site scores a job against the Base CV before tailoring starts, and the role steps write for that score's gaps.
+    if (first) await memoryTailorRepo(userId, scores, docs).saveScore(jobId, "base", null, first);
     const start = await post(`/v1/jobs/${jobId}/tailor`, { tone: "neutral" }) as { run: { id: string; sections: TailorSection[]; currentRoleId?: string | null } };
     let score2: MatchScore | null = null;
     let roleId = start.run.currentRoleId ?? null;

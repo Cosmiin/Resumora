@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { emptyCv, type CvContent, type JobExtraction } from "@resumora/shared";
 import { fakeModel, roleWith } from "../enrich/fake-model.ts";
 import { memoryTailorRepo } from "./memory-repo.ts";
-import { passProposals } from "./section-pass.ts";
+import { confirmedIn, passProposals } from "./section-pass.ts";
 import { sectionSystemPrompt } from "./section-prompts.ts";
 
 const job: JobExtraction = {
@@ -59,5 +59,24 @@ describe("a project's section pass", () => {
     const model = fakeModel(() => replies.shift());
     const result = await passProposals({ model: model.deps, tailor }, { userId: "user-a", run, job, cv, section: "projects", roleId: helper.id });
     expect(result.proposals.filter((p) => p.field === "text")).toHaveLength(3);
+  });
+});
+
+describe("confirmedIn", () => {
+  it("counts a confirmed answer whatever the verb form", () => {
+    expect(confirmedIn("maintained standard operating procedures", ["Did you also maintain the standard operating procedures for these workflows? Yes"])).toBe(true);
+    expect(confirmedIn("monitor queue health", ["Do you have experience monitoring and maintaining queue health? Used queue health"])).toBe(true);
+    expect(confirmedIn("tracking quality signals", ["Have you ever tracked quality signals to improve operational processes? Yes"])).toBe(true);
+    expect(confirmedIn("uses knowledge management systems", ["Used knowledge management systems"])).toBe(true);
+    expect(confirmedIn("planned processes and policies", ["Planning a process and a policy"])).toBe(true);
+    expect(confirmedIn("used Kissflow", ["Do you have experience using Kissflow? Yes"])).toBe(true);
+    expect(confirmedIn("added new reports", ["Did you add new reports? Yes"])).toBe(true);
+    expect(confirmedIn("running payroll", ["Did you run payroll? Yes"])).toBe(true);
+  });
+
+  it("does not confirm a phrase with a word nobody said", () => {
+    expect(confirmedIn("tracked quality signals", ["Used queue health"])).toBe(false);
+    expect(confirmedIn("led payroll", ["Ran payroll for 40 staff"])).toBe(false);
+    expect(confirmedIn("managed", ["Management"])).toBe(false);
   });
 });
