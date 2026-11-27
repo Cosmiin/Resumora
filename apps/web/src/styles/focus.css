@@ -311,6 +311,16 @@
 .ep-addfield .ui-input { flex: 1; min-width: 0; max-width: 22rem; }
 /* The path's first screen while the roles are checked: the lines of a CV being read. */
 .ep-reading { display: grid; gap: var(--space-3); width: 100%; max-width: 24rem; margin: var(--space-2) 0; }
+/* Questions step: the role's answered questions folded into one line each, the open one fading in under them. */
+.bq-passed { display: grid; gap: var(--space-2); margin: 0 0 var(--space-4); padding: 0; list-style: none; }
+.bq-passed-row { display: grid; gap: 2px; padding: var(--space-2) var(--space-4); border-radius: var(--radius-field); background: var(--color-paper-veil); font-size: var(--text-small); overflow-wrap: anywhere; animation: bq-in var(--dur-base) ease-out both; }
+.bq-passed-q { color: var(--color-muted); }
+.bq-passed-a { font-weight: var(--weight-semibold); }
+.bq-passed-a.is-skipped { font-weight: var(--weight-regular); font-style: italic; color: var(--color-muted); }
+.bq-current { animation: bq-in var(--dur-base) ease-out both; }
+.bq-count { margin: 0 0 var(--space-2); font-size: var(--text-small); font-weight: var(--weight-semibold); color: var(--color-muted); }
+@keyframes bq-in { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .bq-passed-row, .bq-current { animation: none; } }
 .ep-rolecard { margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-4); border-left: 3px solid var(--color-ink); background: var(--color-paper-veil); font-size: var(--text-small); overflow-wrap: anywhere; }
 .ep-group { all: unset; cursor: pointer; display: block; width: 100%; font-weight: 600; }
 .ep-group:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }

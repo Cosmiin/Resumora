@@ -24,7 +24,7 @@ const items: BudgetItem[] = [
 describe("BudgetStep", () => {
   it("shows the role on top of every question, and the line when it is about one", async () => {
     render(<BudgetStep cv={cv} items={items} onAnswer={vi.fn()} onTalk={vi.fn()} onDone={vi.fn()} />);
-    expect(screen.getByText(/Step 4 of 4 · Question 1 of 3/)).toBeInTheDocument();
+    expect(screen.getByText(/Step 4 of 4 · Role 1 of 2/)).toBeInTheDocument();
     expect(screen.getByTestId("ep-rolecard")).toHaveTextContent(/Staffing Manager · Robert Half · Mar 2019 – Jun 2021/);
     expect(screen.queryByText(/“Built a candidate pipeline\.”/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Skip" }));
@@ -43,7 +43,7 @@ describe("BudgetStep", () => {
     expect(onAnswer).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("ep-rolecard")).toHaveTextContent("Clerk");
     await userEvent.type(screen.getByLabelText("Your answer"), "Kept stock records");
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
