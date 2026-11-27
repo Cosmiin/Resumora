@@ -70,8 +70,6 @@ export const tailorRo: Record<FlowKey, string> = {
   "tailor.across.roles": "Bifează rolurile în care l-ai folosit",
   "tailor.across.similar": "Nu, dar am folosit ceva similar",
   "tailor.across.none": "Nu, și nici ceva similar",
-  "tailor.across.what": "Ce ai folosit?",
-  "tailor.across.similarRoles": "În ce roluri l-ai folosit?",
   "tailor.what.skills.eyebrow": "Competențele tale, cum sunt acum pe CV",
   "tailor.what.skills.title": "Competențe",
   "tailor.what.skills.other": "Altele",

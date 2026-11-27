@@ -64,46 +64,38 @@ export function QuestionCard({ role, kind, locale = "en", cv, ...props }: Props)
 type Use = NonNullable<Answer["use"]>;
 
 /**
- * Asked once for every role: tick the roles where the tool was used, or name something similar and tick its roles,
- * or say neither (one click, for every role).
+ * Asked once for every role: tick the roles where the tool was used, or say "something similar" or "neither" (one
+ * click each, for every role). A similar tool is not asked for by name or by role (the owner, 27 Nov): the answer
+ * only closes the question.
  */
 function AcrossQuestion({ question, index, total, initial, onNext, onSkip, onBack, roles = [], locale = "en" }:
   Omit<Props, "role" | "kind" | "progress" | "cv" | "job" | "score">) {
   const [use, setUse] = useState<Use | null>(initial?.use ?? null);
-  const [roleIds, setRoleIds] = useState<string[]>(initial?.roleIds ?? []);
-  const [similar, setSimilar] = useState(initial?.use === "similar" ? initial.value ?? "" : "");
+  // An older "similar" answer came with the roles of the tool it named; they are not ticks for the tool asked about.
+  const [roleIds, setRoleIds] = useState<string[]>(initial?.use === "similar" ? [] : initial?.roleIds ?? []);
   const toggle = (id: string) => {
     setRoleIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-    if (use !== "similar") setUse("used");
+    setUse("used");
   };
   const picked = roles.map((r) => r.id).filter((id) => roleIds.includes(id));
-  const ready = use === "none" || (picked.length > 0 && (use === "used" || (use === "similar" && similar.trim() !== "")));
-  const next = () => {
-    if (use === "none") return onNext({ value: "No", via: "option", use: "none" });
-    onNext(use === "similar" ? { value: similar.trim(), via: "typed", use: "similar", roleIds: picked } : { value: "Yes", via: "option", use: "used", roleIds: picked });
-  };
-  const roleButtons = <div className="answer-opts" role="group" aria-label={t(use === "similar" ? "tailor.across.similarRoles" : "tailor.across.roles")}>
-    {roles.map((r) => <button key={r.id} type="button" className="answer-opt" aria-pressed={use !== "none" && roleIds.includes(r.id)} onClick={() => toggle(r.id)}>
-      {[r.title.trim() || t("tailor.role.untitled"), roleMeta(r, locale)].filter(Boolean).join(" · ")}
-    </button>)}
-  </div>;
+  const oneTap = use === "none" || use === "similar";
+  const ready = oneTap || (use === "used" && picked.length > 0);
+  const next = () => onNext(oneTap ? { value: "No", via: "option", use } : { value: "Yes", via: "option", use: "used", roleIds: picked });
 
   return <section className="fm-right" aria-labelledby={`q-${question.id}`}>
     <h2 className="fm-q" id={`q-${question.id}`}>{question.text}</h2>
-    {use !== "similar" && <><p className="ui-label">{t("tailor.across.roles")}</p>{roleButtons}</>}
+    <p className="ui-label">{t("tailor.across.roles")}</p>
+    <div className="answer-opts" role="group" aria-label={t("tailor.across.roles")}>
+      {roles.map((r) => <button key={r.id} type="button" className="answer-opt" aria-pressed={!oneTap && roleIds.includes(r.id)} onClick={() => toggle(r.id)}>
+        {[r.title.trim() || t("tailor.role.untitled"), roleMeta(r, locale)].filter(Boolean).join(" · ")}
+      </button>)}
+    </div>
     <div className="answer-opts">
       <button type="button" className="answer-opt" aria-pressed={use === "similar"} onClick={() => setUse(use === "similar" ? (roleIds.length > 0 ? "used" : null) : "similar")}>
         {t("tailor.across.similar")}</button>
       <button type="button" className="answer-opt" aria-pressed={use === "none"} onClick={() => setUse(use === "none" ? null : "none")}>
         {t("tailor.across.none")}</button>
     </div>
-    {use === "similar" && <div className="ui-stack">
-      <label className="ui-label">{t("tailor.across.what")}
-        <input className="ui-input" value={similar} onChange={(event) => setSimilar(event.target.value)} />
-      </label>
-      <p className="ui-label">{t("tailor.across.similarRoles")}</p>
-      {roleButtons}
-    </div>}
     {question.reason.trim() && <p className="fm-why">{t("enrich.focus.why", { reason: question.reason.trim() })}</p>}
     <div className="fm-foot">
       {onBack && <button type="button" className="fm-ghost fm-back" onClick={onBack}>{t("tailor.question.back")}</button>}

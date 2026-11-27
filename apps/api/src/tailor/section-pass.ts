@@ -25,12 +25,16 @@ const ModelProposalsSchema = z.object({
 const VerifySchema = z.object({ results: z.array(z.object({ itemId: z.string(), claims: z.array(z.string()) })) });
 
 /**
- * What an all-roles answer says, as a note: "Used KissFlow", or for something similar the person's own tool without
- * the asked one's name, so no check reads it as a source for that tool. Null when neither was used.
+ * What an all-roles answer says, as a note: "Used KissFlow". Null when neither was used, and for "something similar":
+ * that answer is one tap now, with no tool named and no role ticked, so there is nothing true to note. An older
+ * answer that named its tool and roles keeps its note: the person's own tool without the asked one's name, so no
+ * check reads it as a source for that tool.
  */
 export function acrossNote(question: TailorQuestion, answer: Answer): string | null {
   if (answer.via === "skip" || answer.use === "none" || !answer.value?.trim()) return null;
-  if (answer.use === "similar") return `Used ${answer.value.trim()} for the kind of work a tool the job names does (not that tool itself)`;
+  if (answer.use === "similar") {
+    return answer.roleIds?.length ? `Used ${answer.value.trim()} for the kind of work a tool the job names does (not that tool itself)` : null;
+  }
   return `Used ${question.skill ?? question.text}`;
 }
 

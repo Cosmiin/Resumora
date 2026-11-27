@@ -47,5 +47,7 @@ describe("an all-roles answer as a note", () => {
     expect(similar).toContain("Make.com");
     expect(unknownTools("Automated approvals in KissFlow", [similar])).toEqual(["KissFlow"]);
     expect(acrossNote(question, { questionId: "q", value: "No", via: "option", use: "none" })).toBeNull();
+    // "Something similar" is one tap now: no tool is named and no role ticked, so there is nothing to note.
+    expect(acrossNote(question, { questionId: "q", value: "No", via: "option", use: "similar" })).toBeNull();
   });
 });

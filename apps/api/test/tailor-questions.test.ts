@@ -591,4 +591,16 @@ describe("questions for every role at once", () => {
     expect(model.requests).toHaveLength(calls);
   });
 
+  it("'something similar' is one tap: it saves no note, and no role asks the gap again", async () => {
+    const runId = await startRun();
+    replies = [[tool("Kubernetes")]];
+    const [k8s] = await across(runId);
+    await answer(runId, { questionId: k8s!.id, value: "No", via: "option", use: "similar" });
+    expect(await jobNotes()).toEqual([]);
+    // The role step still asks about the job's other gap, but Kubernetes is no longer among the gaps it is sent.
+    replies = [[ask("Kubernetes here?", { gap: "r0" })]];
+    expect(await questions(runId, "experience", newest.id)).toEqual([]);
+    expect(JSON.stringify(JSON.parse(String((model.requests.at(-1)!.messages as { content: string }[])[1]!.content)).gaps)).not.toContain("Kubernetes");
+  });
+
 });

@@ -66,14 +66,25 @@ describe("a question for every role at once", () => {
     expect(askAcross).toHaveBeenCalledTimes(1);
   });
 
-  it("something similar: name it and tick the roles it was used in", async () => {
+  it("something similar: one click, with no tool to name and no roles to tick", async () => {
     const user = userEvent.setup();
     open();
     await user.click(await screen.findByRole("button", { name: "No, but I used something similar" }));
-    await user.type(screen.getByRole("textbox", { name: "What did you use?" }), "Make.com");
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByText("What did you use?")).toBeNull();
+    // The roles are listed once, never a second time under the answer.
+    expect(screen.getAllByRole("button", { name: /^Business Analyst/ })).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Finish the questions" }));
+    expect(sendAnswers).toHaveBeenCalledWith("run1", [{ questionId: "qa", value: "No", via: "option", use: "similar" }]);
+  });
+
+  it("something similar gives way to a role ticked afterwards", async () => {
+    const user = userEvent.setup();
+    open();
+    await user.click(await screen.findByRole("button", { name: "No, but I used something similar" }));
     await user.click(screen.getByRole("button", { name: /^Business Analyst/ }));
     await user.click(screen.getByRole("button", { name: "Finish the questions" }));
-    expect(sendAnswers).toHaveBeenCalledWith("run1", [{ questionId: "qa", value: "Make.com", via: "typed", use: "similar", roleIds: ["r1"] }]);
+    expect(sendAnswers).toHaveBeenCalledWith("run1", [{ questionId: "qa", value: "Yes", via: "option", use: "used", roleIds: ["r1"] }]);
   });
 
   it("neither: one click answers it for every role", async () => {
