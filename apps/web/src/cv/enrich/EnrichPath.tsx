@@ -15,7 +15,7 @@ import { EndStep, type HeldChange } from "./EndStep.tsx";
 import { FactsStep } from "./FactsStep.tsx";
 import { PrepRing, type PrepRow } from "./PrepRing.tsx";
 import { checkChanges, getSkillSuggestions, placeAnswersOnCv, reportFailure, type SkillSuggestion } from "./enrich-api.ts";
-import { PATH_PARALLEL, createLimiter, prepareRoleChanges, toChanges } from "./prepare.ts";
+import { PATH_PARALLEL, createLimiter, prepareRoleChanges, toChanges, type Limiter } from "./prepare.ts";
 import type { Prepared } from "./prepared.ts";
 import { ScoreRows } from "./ScoreRows.tsx";
 import { PathScreen } from "./SectionSuggest.tsx";
@@ -33,6 +33,11 @@ type Props = {
   onScore?(result: RoleResult): void;
   /** The companies and tools answers asked for while the import was on screen, when the path opens from one. */
   prepared?: Prepared | null;
+  /**
+   * Opened from an import, whose screen already showed the score and the way in (owner, 27 Nov 2026): no start screen.
+   * The first step shows as soon as every role is scored.
+   */
+  autoStart?: boolean;
 };
 
 /** A CV whose weighted average reaches this is saved as enriched. */
@@ -107,11 +112,11 @@ const END_WAIT_MS = 20000;
 
 /**
  * The short enrichment path (owner, 17 Nov 2026; score/9 on 19 Nov): the CV's score, then Shape (merges the person
- * confirms), what each company does, the tools per role, the questions worth the most across the CV, then every role
- * prepared at once and put straight on the CV, and the end with the score again. A change that would lower a role's
+ * confirms), what each company does, the tools per role, the questions worth the most across the CV, each role
+ * prepared as soon as it has its answers and put straight on the CV, and the end with the score again. A change that would lower a role's
  * score is held and shown at the end with Add anyway. Answers are saved as role notes as they are given.
  */
-export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore, prepared }: Props) {
+export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore, prepared, autoStart = false }: Props) {
   const [stage, setStage] = useState<Stage>({ kind: "start" });
   const [before, setBefore] = useState<number | null>(null);
   const [rolesBefore, setRolesBefore] = useState<ReadonlyMap<string, number | null>>(new Map());
@@ -124,8 +129,11 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   const asked = useRef(new Set<string>());
   const got = useRef(new Map<string, Got>());
   const latest = useRef(cv);
+  const latestScores = useRef(scores);
   const endShown = useRef(false);
-  useEffect(() => { latest.current = cv; });
+  useEffect(() => { latest.current = cv; latestScores.current = scores; });
+  // Shape's merges are checked and put on the CV while the companies and tools are answered; the questions wait for it.
+  const [shapeBusy, setShapeBusy] = useState(false);
 
   const graded = gradedItems(cv);
   const weights = strengthWeights(cv);
@@ -151,16 +159,23 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   const budget = (): BudgetItem[] => {
     const known = new Set([...asked.current, ...latest.current.experience.concat(latest.current.volunteering).flatMap((r) => r.notes.map((n) => questionKey(n.question)))]);
     return pickBudget({
-      items: gradedItems(latest.current).map(({ item }) => ({ id: item.id, result: scores.get(item.id)?.state === "ready" ? scores.get(item.id)?.result : undefined })),
+      items: gradedItems(latest.current).map(({ item }) => {
+        const entry = latestScores.current.get(item.id);
+        return { id: item.id, result: entry?.state === "ready" ? entry.result : undefined };
+      }),
       weights: strengthWeights(latest.current), asked: known, size: PATH_BUDGET,
     });
   };
   const toBudget = () => {
     noteIds.current = new Map();
+    newRound();
     const items = budget();
     for (const item of items) asked.current.add(questionKey(item.question.text));
-    if (items.length) setStage({ kind: "budget", items });
-    else void prepare();
+    if (!items.length) return void finishRound();
+    setStage({ kind: "budget", items });
+    // A role with no question this round already has all it will get: it is prepared while the questions are answered.
+    const asking = new Set(items.map((item) => item.roleId));
+    for (const { item } of gradedItems(latest.current)) if (!asking.has(item.id)) void prepareRole(item.id);
   };
 
   /** The scores before a round, for the end screen. */
@@ -170,68 +185,101 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   };
 
   /**
-   * Every role at once, through one limit for the whole CV: its changes from what it got in this round and its weak
-   * lines, then the facts its answers still lack placed on the page, then the check (what would lower the score held,
-   * the new score predicted), then straight onto the CV. A failed check leaves that role as it is; an outdated one (409)
-   * puts its changes on the CV without a prediction, and the normal score runs.
+   * This round's preparing: one limit for the whole CV, each role's task once it has started, and what came of them.
+   * A role is prepared as soon as it has everything it will get this round (owner, 27 Nov 2026): one with no question
+   * when the questions start, one with questions when the person leaves it, the rest when the questions end. So the
+   * wait at the end is only for what is still running.
    */
-  const prepare = async () => {
+  const prep = useRef<{ limit: Limiter; tasks: Map<string, Promise<void>>; held: HeldChange[]; failed: boolean }>(
+    { limit: createLimiter(PATH_PARALLEL), tasks: new Map(), held: [], failed: false });
+  const newRound = () => {
+    prep.current = { limit: createLimiter(PATH_PARALLEL), tasks: new Map(), held: [], failed: false };
+    setRows([]);
+  };
+
+  /**
+   * One role, once per round: its changes from what it got in this round and its weak lines, then the facts its answers
+   * still lack placed on the page, then the check (what would lower the score held, the new score predicted), then
+   * straight onto the CV. A failed check leaves that role as it is; an outdated one (409) puts its changes on the CV
+   * without a prediction, and the normal score runs. A role with no answer and no weak line is left alone.
+   */
+  const prepareRole = (roleId: string): Promise<void> => {
+    const p = prep.current;
+    const started = p.tasks.get(roleId);
+    if (started) return started;
+    const scoreNow = () => {
+      const entry = latestScores.current.get(roleId);
+      return entry?.state === "ready" ? entry.result : undefined;
+    };
+    const g = got.current.get(roleId);
+    const first = findGraded(latest.current, roleId)?.item;
+    const weak = (scoreNow()?.bullets ?? []).some((b) => b.score < CLEAR_AT);
+    if (!first || !((g?.facts ?? false) || weak)) {
+      const nothing = Promise.resolve();
+      p.tasks.set(roleId, nothing);
+      return nothing;
+    }
+    setRows((all) => [...all, { id: roleId, name: [first.title, first.company].filter(Boolean).join(" · "), answers: g?.questions.size ?? 0, state: "working" }]);
+    const task = (async () => {
+      // The server reads the role's answers from the saved CV.
+      await waitForSave().catch(() => undefined);
+      const now = latest.current;
+      const item = findGraded(now, roleId)?.item;
+      // This role failed somewhere: its piece of the ring turns red. The end screen still says some changes failed.
+      let roleFailed = false;
+      if (item) {
+        const result = scoreNow();
+        const describe = !!g && g.facts && (g.context || item.description.trim() !== "");
+        const answeredRole = !!g && g.role;
+        const out = await prepareRoleChanges({
+          cv: now, roleId, result, answeredLines: g?.lines ?? new Set(), answeredRole,
+          thinWithAnswers: !!result?.thin && answeredRole, describe, limit: p.limit,
+        });
+        roleFailed = out.failed;
+        const print = fingerprint(item, now.locale);
+        let changes = toChanges(out.changes);
+        const questions = [...(g?.questions ?? [])].slice(0, 20);
+        if (questions.length) {
+          const placed = await p.limit(() => placeAnswersOnCv({ roleId, fingerprint: print, changes, questions }))
+            .then((a) => a.changes).catch((err: unknown) => { roleFailed = true; reportFailure("use-answers", roleId, err); return []; });
+          changes = withPlaced(changes, placed);
+        }
+        if (changes.length) {
+          try {
+            const answer = await p.limit(() => checkChanges({ roleId, fingerprint: print, changes, hold: true }));
+            const kept = changes.filter((c) => answer.kept.includes(c.id));
+            if (kept.length) dispatch({ type: "applyRoleChanges", roleId, changes: kept });
+            onScore?.(answer.result);
+            p.held.push(...answer.held.map((change) => ({
+              roleId, change, ask: answer.asks.find((a) => a.changeId === change.id), better: answer.better.find((b) => b.changeId === change.id)?.text,
+            })));
+          } catch (err) {
+            if (err instanceof ApiClientError && err.status === 409) dispatch({ type: "applyRoleChanges", roleId, changes });
+            else { roleFailed = true; reportFailure("check-changes", roleId, err); }
+          }
+        }
+      }
+      p.failed ||= roleFailed;
+      if (prep.current === p) setRows((all) => all.map((r) => (r.id === roleId ? { ...r, state: roleFailed ? "failed" : "done" } : r)));
+    })();
+    p.tasks.set(roleId, task);
+    return task;
+  };
+
+  /** The questions are over (or there were none): every role not started yet is prepared, then the round ends. */
+  const finishRound = async () => {
     // A new round: its end waits for its own scores.
     endShown.current = false;
     setTimedOut(false);
     const mine = ++round.current;
     setSkills(null);
     setStage({ kind: "preparing" });
-    await waitForSave().catch(() => undefined);
-    const now = latest.current;
-    const limit = createLimiter(PATH_PARALLEL);
-    const work = gradedItems(now).flatMap(({ item }) => {
-      const entry = scores.get(item.id);
-      const result = entry?.state === "ready" ? entry.result : undefined;
-      const g = got.current.get(item.id);
-      const weak = (result?.bullets ?? []).some((b) => b.score < CLEAR_AT);
-      return (g?.facts ?? false) || weak ? [{ item, result, g }] : [];
-    });
-    setRows(work.map(({ item, g }) => ({ id: item.id, name: [item.title, item.company].filter(Boolean).join(" · "), answers: g?.questions.size ?? 0, state: "working" })));
-    const held: HeldChange[] = [];
-    let failed = false;
-    await Promise.all(work.map(async ({ item, result, g }) => {
-      const describe = !!g && g.facts && (g.context || item.description.trim() !== "");
-      const answeredRole = !!g && g.role;
-      const out = await prepareRoleChanges({
-        cv: now, roleId: item.id, result, answeredLines: g?.lines ?? new Set(), answeredRole,
-        thinWithAnswers: !!result?.thin && answeredRole, describe, limit,
-      });
-      // This role failed somewhere: its piece of the ring turns red. The end screen still says some changes failed.
-      let roleFailed = out.failed;
-      const print = fingerprint(item, now.locale);
-      let changes = toChanges(out.changes);
-      const questions = [...(g?.questions ?? [])].slice(0, 20);
-      if (questions.length) {
-        const placed = await limit(() => placeAnswersOnCv({ roleId: item.id, fingerprint: print, changes, questions }))
-          .then((a) => a.changes).catch((err: unknown) => { roleFailed = true; reportFailure("use-answers", item.id, err); return []; });
-        changes = withPlaced(changes, placed);
-      }
-      if (changes.length) {
-        try {
-          const answer = await limit(() => checkChanges({ roleId: item.id, fingerprint: print, changes, hold: true }));
-          const kept = changes.filter((c) => answer.kept.includes(c.id));
-          if (kept.length) dispatch({ type: "applyRoleChanges", roleId: item.id, changes: kept });
-          onScore?.(answer.result);
-          held.push(...answer.held.map((change) => ({
-            roleId: item.id, change, ask: answer.asks.find((a) => a.changeId === change.id), better: answer.better.find((b) => b.changeId === change.id)?.text,
-          })));
-        } catch (err) {
-          if (err instanceof ApiClientError && err.status === 409) dispatch({ type: "applyRoleChanges", roleId: item.id, changes });
-          else { roleFailed = true; reportFailure("check-changes", item.id, err); }
-        }
-      }
-      failed ||= roleFailed;
-      setRows((all) => all.map((r) => (r.id === item.id ? { ...r, state: roleFailed ? "failed" : "done" } : r)));
-    }));
+    const p = prep.current;
+    for (const { item } of gradedItems(latest.current)) void prepareRole(item.id);
+    await Promise.all(p.tasks.values());
     // Every held line comes before the scores (owner, 25 Nov 2026): its question, its better version, or the line itself.
     facts.current = { chain: Promise.resolve(), failed: [] };
-    setStage(held.length ? { kind: "facts", items: held, failed } : { kind: "end", held: [], failed });
+    setStage(p.held.length ? { kind: "facts", items: p.held, failed: p.failed } : { kind: "end", held: [], failed: p.failed });
     // The server reads the saved CV, so this round's lines are saved first. A failure shows no block (owner's call 5).
     void waitForSave().catch(() => undefined).then(() => getSkillSuggestions())
       .then((answer) => { if (round.current === mine) setSkills(answer.suggestions); })
@@ -240,11 +288,15 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
 
   /**
    * Shape's merges and reorders, per role: checked first (only the merged lines graded, nothing held), then put on the
-   * CV, then the predicted score shown at once. A failed or outdated check still puts them on the CV; the normal score runs.
+   * CV, then the predicted score put in place. A failed or outdated check still puts them on the CV; the normal score
+   * runs. The companies screen shows at once (owner, 27 Nov 2026): the check runs behind it, and only the questions,
+   * which are picked from the new scores, wait for it.
    */
-  const shaped = async (list: ShapeDone) => {
-    if (list.length) {
-      setStage({ kind: "shaping" });
+  const shaped = (list: ShapeDone) => {
+    setStage({ kind: "companies" });
+    if (!list.length) return;
+    setShapeBusy(true);
+    void (async () => {
       await waitForSave().catch(() => undefined);
       const now = latest.current;
       await Promise.all(list.map(async ({ roleId, changes }) => {
@@ -255,9 +307,15 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
         dispatch({ type: "applyRoleChanges", roleId, changes });
         if (result) onScore?.(result);
       }));
-    }
-    setStage({ kind: "companies" });
+      setShapeBusy(false);
+    })();
   };
+  // The tools are done but Shape's check is not: the questions start in the render that has its scores.
+  const waitingForShape = stage.kind === "shaping" && !shapeBusy;
+  useEffect(() => {
+    if (waitingForShape) void waitForSave().catch(() => undefined).then(toBudget);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingForShape]);
 
   /**
    * A held line one fact away (score/12): the answer is saved as a role note like any other, then placed on that line
@@ -295,6 +353,18 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
     if (enriched) dispatch({ type: "markEnriched", at: new Date().toISOString() });
   }, [enriched, dispatch]);
 
+  /** Leaves the start: the scores of this round's "before", then Shape if any role needs it, else the companies. */
+  const begin = () => {
+    markBefore();
+    got.current = new Map();
+    setStage({ kind: hasShapeWork(cv, scores) ? "shape" : "companies" });
+  };
+  const starting = autoStart && stage.kind === "start" && settled;
+  useEffect(() => {
+    if (starting) begin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [starting]);
+
   const screen = (children: ReactNode) => <PathScreen context={t("enrich.path.dialog")} onClose={onClose}>{children}</PathScreen>;
 
   if (stage.kind === "start") {
@@ -302,7 +372,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
     return screen(
       <div className="rr-card" aria-busy={!settled}>
         <p className="rr-where">{t("enrich.path.dialog")}</p>
-        {settled ? (
+        {settled && !autoStart ? (
           <>
             <h2 className="rr-num" id="fm-step-title" tabIndex={-1}>{average === null ? t("enrich.path.v2.noScore") : t("enrich.path.v2.score", { n: average })}</h2>
             <p className="rr-lead" role="status">{t("enrich.path.v2.lead", { k: PATH_BUDGET })}</p>
@@ -317,18 +387,14 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
           </>
         )}
         <div className="rr-actions">
-          <button type="button" className="fm-btn" disabled={!settled} onClick={() => {
-            markBefore();
-            got.current = new Map();
-            setStage({ kind: hasShapeWork(cv, scores) ? "shape" : "companies" });
-          }}>{t("enrich.run.start")}</button>
+          {!autoStart && <button type="button" className="fm-btn" disabled={!settled} onClick={begin}>{t("enrich.run.start")}</button>}
           <button type="button" className="ui-btn" onClick={onClose}>{t("enrich.path.notNow")}</button>
         </div>
       </div>,
     );
   }
   if (stage.kind === "shape") {
-    return screen(<ShapeStep cv={cv} scores={scores} onDone={(list) => void shaped(list)} />);
+    return screen(<ShapeStep cv={cv} scores={scores} onDone={shaped} />);
   }
   if (stage.kind === "shaping") {
     return screen(
@@ -356,7 +422,8 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
           dispatch({ type: "setNote", roleId, note });
           gotFor(roleId, note.question);
         }
-        void waitForSave().catch(() => undefined).then(toBudget);
+        if (shapeBusy) setStage({ kind: "shaping" });
+        else void waitForSave().catch(() => undefined).then(toBudget);
       }} />,
     );
   }
@@ -374,7 +441,8 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
           save(`${roleId}|talk`, roleId, BRAIN_DUMP_QUESTION, text, via);
           gotFor(roleId, BRAIN_DUMP_QUESTION).role = true;
         }}
-        onDone={() => void prepare()} />,
+        onRoleDone={(roleId) => void prepareRole(roleId)}
+        onDone={() => void finishRound()} />,
     );
   }
   if (stage.kind === "facts") {

@@ -27,7 +27,8 @@
   .import-left, .import-right { grid-column: 1; grid-row: auto; }
 }
 .import-gap { margin-top: var(--space-4); }
-.import-next { margin-top: var(--space-6); }
+.import-score { min-height: 2.5rem; margin: var(--space-6) 0 0; font: var(--weight-display) 2rem / 1.2 var(--font-display); font-variant-numeric: tabular-nums; }
+.import-next { margin-top: var(--space-2); }
 .import-details { margin-top: var(--space-4); }
 .import-details > summary { width: fit-content; min-height: var(--control-h-sm); display: flex; align-items: center; cursor: pointer; font-weight: var(--weight-bold); color: var(--color-coach); text-decoration: underline; text-underline-offset: 4px; }
 .import-details[open] > summary { margin-bottom: var(--space-4); }
