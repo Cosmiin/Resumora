@@ -5,6 +5,7 @@ import {
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
+import { withWhy } from "./ad-line.ts";
 import { ApiError } from "../errors.ts";
 import { acrossSystemPrompt, acrossUserMessage, gapSystemPrompt, gapUserMessage, questionSystemPrompt, questionUserMessage } from "./question-prompts.ts";
 import { acrossNote, currentRole } from "./section-pass.ts";
@@ -216,11 +217,12 @@ const ModelGapQuestionsSchema = z.object({
  */
 export async function askGaps(
   deps: { model: ModelDeps; tailor: TailorRepo },
-  input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; questionLanguage?: Locale },
+  input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; questionLanguage?: Locale; adText?: string | null },
 ): Promise<Question[]> {
   const asked = input.run.questions ?? [];
   const stored = asked.filter((question) => question.scope === "all");
-  if (stored.length > 0) return stored;
+  // Questions stored before each said why it is asked get that now, on the way out.
+  if (stored.length > 0) return stored.map((question) => (question.need ? question : withWhy(question, input.job, input.adText)));
   const cv = stripHeader(input.cv).cv;
   if (cv.experience.length === 0) return [];
   const score = await deps.tailor.getScore(input.run.jobId, "base");
@@ -253,8 +255,8 @@ export async function askGaps(
     // A suggestion stands only on the role's own words: a hint that is not in a suggested role goes, with that role.
     const hint = question.hint?.trim().slice(0, MAX_TEXT) ?? "";
     const suggested = hint ? [...new Set(question.roleIds)].filter((id) => lines.get(id)?.some((line) => line.includes(hint))) : [];
-    fresh.push({ id: newId(), section: "experience", roleId: null, text, kind: "skill", options: [], reason: question.reason, gap: question.gap,
-      scope: "all", skill, ...(suggested.length > 0 ? { suggestedRoleIds: suggested, hint } : {}) });
+    fresh.push(withWhy({ id: newId(), section: "experience", roleId: null, text, kind: "skill", options: [], reason: question.reason, gap: question.gap,
+      scope: "all", skill, ...(suggested.length > 0 ? { suggestedRoleIds: suggested, hint } : {}) }, input.job, input.adText));
   }
   if (fresh.length > 0) await deps.tailor.updateRun(input.run.id, { questions: [...asked, ...fresh] });
   return fresh;

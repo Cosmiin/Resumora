@@ -127,6 +127,10 @@ export const QuestionSchema = z.object({
   suggestedRoleIds: z.array(z.string()).optional(),
   /** The words of those roles' lines that hint at it, copied from the CV. */
   hint: z.string().optional(),
+  /** Why an all-roles question is asked: the ad needs it (a must-have), would like it, or only names it as a keyword. */
+  need: z.enum(["must", "nice", "keyword"]).optional(),
+  /** The ad's own sentence about it (a short piece of it), copied from the ad; absent when none could be found. */
+  adLine: z.string().optional(),
 });
 export type Question = z.infer<typeof QuestionSchema>;
 
