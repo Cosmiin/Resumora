@@ -76,3 +76,21 @@ Notes:
   answers are the run) does it send them all. The fix was not reviewed again (one line and a test).
 - Deploy order matters: the API first (it must accept the two new note fields), then the website.
 - Changes to auth, RLS, migrations: none. The stored CV gains two optional fields on a note; no migration.
+
+## Part C: published
+PR 103 merged (8720b1b8) and published on 27 Nov 2026: API version 4cf0969e, website bundle index-C4LaoK_9.js.
+
+## After the owner's first run: Shape proposed merges of unrelated lines — done
+The owner's run (27 Nov, "System Integration Specialist") showed two pairs of unrelated lines under "These 2 lines
+describe the same work" (requirements and UAT with dashboards; data security with change management), each merged
+into one very long sentence.
+Cause: the prompt told the model to "aim at 6 lines: merge only while it has more than 6", so on a role with more than
+six lines it merged something even when nothing overlapped, by joining two lines with "and"; and it named "the same
+people or the same tools" as a reason to merge. The only length check was the 440-character line limit.
+Fix (`apps/api/src/enrich/shape.ts`): the prompt asks only for lines that say the same thing twice, says a role may keep
+more than 6 lines, and that two tasks joined with "and" is not a merge; and a merge is dropped when its text is its
+lines put together (`joinsLines`: longer than its longest line plus half of what the other lines hold).
+Trial with the real AI (`eval/enrich/shape.eval.ts`, two fictional roles of eight lines): on the role whose lines are
+all different work the live code proposed 4 merges (one joined "wrote handover guides" with "negotiated software
+contracts"); the new code proposed none, in 2 of 2 runs. On the role with two real overlaps both versions proposed
+the two merges, each about as long as its longest line (177 + 122 characters became 190 to 199; 218 + 152 became 255).
