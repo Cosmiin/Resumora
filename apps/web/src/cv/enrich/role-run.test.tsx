@@ -129,6 +129,19 @@ describe("the start of a role", () => {
     expect(sent.changes).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "bullet", bulletId: "b1", text: NEW_B1 })]));
   });
 
+  it("the placing step gets this run's answers only, not the ones the role already held", async () => {
+    const told: Experience = { ...role, notes: [
+      { id: "old1", question: "What does Nordlane Logistics do?", answer: "Parcel delivery for online shops.", via: ["pick"], askedAt: "2026-11-20T00:00:00Z", topic: "company" },
+    ] };
+    render(<Harness initialRole={told} roleResult={{ ...result, fingerprint: fingerprint(told, "en"), roleQuestions: [result.roleQuestions[1]!] }} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await answer("1–5 people");
+    await answer("Fewer planning mistakes");
+    await screen.findByRole("heading", { name: "Here is the role as it will read" });
+    const sent = api.placeAnswersOnCv.mock.calls[0]![0] as { questions: string[] };
+    expect(sent.questions).toEqual(["Did anyone report to you in this role?", "What changed after you trained them?"]);
+  });
+
   it("an answer is saved with what it is about: the role topic, or the line", async () => {
     const actions: CvAction[] = [];
     render(<Harness onAction={(a) => actions.push(a)} roleResult={{ ...result, roleQuestions: [result.roleQuestions[1]!] }} />);

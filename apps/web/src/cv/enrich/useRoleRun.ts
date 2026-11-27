@@ -290,8 +290,12 @@ export function useRoleRun(opts: Options) {
     for (const p of added) changes.push({ id: `new:${p.id}`, kind: "new", before: "", after: p.text });
     // What the answers say that a line's rewrite does not take (a tool ticked for the whole role, the team, a free
     // answer): placed once, by the step that sees the whole role (owner, 27 Nov 2026: one answer lands once).
-    const questions = now.notes.filter((n) => n.jobId === undefined).map((n) => n.question).slice(-20);
-    if (questions.length > 0 && (s.view.answered > 0 || fromEarlier)) {
+    // Only this run's answers (by note, so one given again after Back or re-opened counts): an earlier answer was
+    // placed, or declined, in its own run. With nothing asked this time, the earlier answers are the run.
+    const mine = new Set(Object.values(s.view.answers).map((a) => a.noteId));
+    const own = now.notes.filter((n) => n.jobId === undefined && (mine.size > 0 ? mine.has(n.id) : fromEarlier));
+    const questions = own.map((n) => n.question).slice(-20);
+    if (questions.length > 0) {
       const sent = toChanges(changes);
       const placed = await saved((_, print) => placeAnswersOnCv({ roleId: o.roleId, fingerprint: print, changes: sent, questions }))
         .then((a) => a?.changes ?? []).catch(() => []);

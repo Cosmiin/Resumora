@@ -46,7 +46,7 @@ PR 101 merged (0374b3db) and published on 27 Nov 2026: website bundle index-BA1N
 
 ## Part C (Tasks 6–7): a note says what it is about; one answer lands once — done
 session: Scurtează fluxul de îmbogățire · builder: claude
-commit: see the branch (base 0374b3db) · reviews: 1 (Opus, whole part) · fix rounds: see below · guard denials: 0
+commits: 62b1d422 + review fix (base 0374b3db) · reviews: 1 (Opus, whole part) · fix rounds: 1 · guard denials: 0
 open: none
 
 Trial with the real AI (`eval/enrich/once.eval.ts`, fictional role modelled on the run of 27 Nov: five lines, six
@@ -69,7 +69,10 @@ Notes:
 - Ruling (Task 6): `ROLE_TOPICS` moved from `enrich.ts` to `cv.ts` (the note schema needs it); nothing else changed
   for its users. The budget drops an answered topic by filtering the role questions before `pickBudget`, so
   `pickBudget` is untouched.
-- Ruling (Task 7): the role run's placing step sends the questions of all the role's enrichment notes (the last 20),
-  not only this run's, so an answer the path saved but never placed (the path was closed early) still lands.
+- Review verdict "pass", two low findings on one line, fixed: the role run's placing step first sent the questions of
+  every enrichment note of the role, so an earlier answer (also one the person had declined on an approve screen) was
+  offered again on every later run, and on a role with more than 20 notes a re-given answer could fall outside the
+  last 20. It now sends this run's answers, found by note id; only when nothing was asked this time (the earlier
+  answers are the run) does it send them all. The fix was not reviewed again (one line and a test).
 - Deploy order matters: the API first (it must accept the two new note fields), then the website.
 - Changes to auth, RLS, migrations: none. The stored CV gains two optional fields on a note; no migration.
