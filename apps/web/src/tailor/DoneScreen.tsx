@@ -11,10 +11,8 @@ import { getTailored } from "./tailored-api.ts";
 
 type Props = {
   jobId: string; docId: string | null; base: MatchScore | null; final: MatchScore | null; job: JobExtraction | null;
-  /** Opens the finished roles, to change an answer; absent when there is nothing to go back to. */
+  /** Opens the questions with the answers given, to change them and tailor again; absent when nothing was asked. */
   onAnswers?(): void;
-  /** The points each stop added in this visit, for "Where the points came from". */
-  gains?: { name: string; points: number }[];
   /** The parts this tailoring could not write: they stay as the person wrote them, and are named. */
   failed?: string[];
 };
@@ -30,7 +28,7 @@ export function mustHaves(final: MatchScore | null, job: JobExtraction | null): 
  * The result: the match before and after, what moved it, how the tailored CV stands on the ad's keywords and
  * must-haves (one it does not show is named), and where to go next.
  */
-export function DoneScreen({ jobId, docId, base, final, job, onAnswers, gains = [], failed = [] }: Props) {
+export function DoneScreen({ jobId, docId, base, final, job, onAnswers, failed = [] }: Props) {
   // The tailored CV as it stands: the list of changes reads it, an undo replaces it, a download uses it.
   const [cv, setCv] = useState<TailoredCv | null>(null);
   const [busy, setBusy] = useState<ExportFormat | null>(null);
@@ -68,7 +66,6 @@ export function DoneScreen({ jobId, docId, base, final, job, onAnswers, gains = 
 
   const mustsBefore = mustHaves(base, job).filter((must) => must.met).length;
   const diff = (final?.total ?? 0) - (base?.total ?? final?.total ?? 0);
-  const most = Math.max(1, ...gains.map((gain) => gain.points));
 
   return <section className="tailor-result">
     <h1 className="ui-title">{musts.length === 0 ? t("tailor.finish.titlePlain")
@@ -89,12 +86,21 @@ export function DoneScreen({ jobId, docId, base, final, job, onAnswers, gains = 
           {musts.length > 0 && <li>{t("tailor.result.musts", { a: mustsBefore, b: musts.length - open, total: musts.length })}</li>}
         </ul>
       </div>}
-      {gains.length > 0 && <div className="ui-sheet tailor-result-card">
-        <p className="ui-label">{t("tailor.result.from")}</p>
-        <ul className="tailor-result-from">{gains.map((gain) => <li key={gain.name}>
-          <span>{gain.name}</span><i style={{ width: `${Math.round((gain.points / most) * 100)}%` }} /><b>+{gain.points}</b></li>)}</ul>
-      </div>}
     </div>}
+    {unchecked > 0 && <p className="ui-notice tailor-gap">
+      {t(unchecked === 1 ? "tailor.done.checkOne" : "tailor.done.checkMany", { n: unchecked })}{" "}
+      <Link to={to("review=1")}>{t("tailor.done.review")}</Link>
+    </p>}
+    {file === "failed" && <p className="ui-notice ui-notice--bad tailor-gap" role="alert">{t("cvs.export.failed")}</p>}
+    {file && file !== "failed" && <p className="ui-notice ui-notice--good tailor-gap" role="status">{t("cvs.export.done", { name: file.name })}</p>}
+    <nav aria-label={t("tailor.done.next")} className="tailor-downloads tailor-gap">
+      {downloadButton("pdf", t("cvs.export.pdf"), t("cvs.export.pdfWorking"), true)}
+      {downloadButton("docx", t("cvs.export.word"), t("cvs.export.wordWorking"))}
+      <Link className="ui-small" to={`/jobs/${encodeURIComponent(jobId)}/cv/export${query}`}>{t("tailor.done.template")}</Link>
+      <Link className="ui-btn" to={page}>{t("tailor.finish.open")}</Link>
+      <Link className="ui-btn ui-btn--quiet" to={to("tab=letter")}>{t("tailor.done.letter")}</Link>
+      {onAnswers && <button type="button" className="ui-btn ui-btn--quiet" onClick={onAnswers}>{t("tailor.done.changeAnswers")}</button>}
+    </nav>
     {failed.length > 0 && <p className="ui-notice tailor-gap" role="status">
       {t(failed.length === 1 ? "tailor.done.failedOne" : "tailor.done.failedMany", { n: failed.length, list: failed.join(", ") })}</p>}
     {cv && <ChangesList cv={cv} onChange={(next) => { setCv(next); setEdited(true); }} />}
@@ -123,18 +129,5 @@ export function DoneScreen({ jobId, docId, base, final, job, onAnswers, gains = 
         </ul>
       </>}
     </div>
-    {unchecked > 0 && <p className="ui-notice tailor-gap">
-      {t(unchecked === 1 ? "tailor.done.checkOne" : "tailor.done.checkMany", { n: unchecked })}{" "}
-      <Link to={to("review=1")}>{t("tailor.done.review")}</Link>
-    </p>}
-    {file === "failed" && <p className="ui-notice ui-notice--bad tailor-gap" role="alert">{t("cvs.export.failed")}</p>}
-    {file && file !== "failed" && <p className="ui-notice ui-notice--good tailor-gap" role="status">{t("cvs.export.done", { name: file.name })}</p>}
-    <nav aria-label={t("tailor.done.next")} className="tailor-downloads tailor-gap">
-      {downloadButton("pdf", t("cvs.export.pdf"), t("cvs.export.pdfWorking"), true)}
-      {downloadButton("docx", t("cvs.export.word"), t("cvs.export.wordWorking"))}
-      <Link className="ui-small" to={`/jobs/${encodeURIComponent(jobId)}/cv/export${query}`}>{t("tailor.done.template")}</Link>
-      <Link className="ui-btn" to={page}>{t("tailor.finish.open")}</Link>
-      <Link className="ui-btn ui-btn--quiet" to={to("tab=letter")}>{t("tailor.done.letter")}</Link>
-    </nav>
   </section>;
 }

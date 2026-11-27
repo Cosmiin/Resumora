@@ -274,11 +274,15 @@ export async function saveAnswers(
   const content = (await deps.cv.get()).content;
   const roleIds = new Set(scoredItems(content).map(({ item }) => item.id));
   const fallback = newestRole(content.experience)?.id;
+  const noted = new Map(scoredItems(content).map(({ item }) => [item.id, item.notes]));
   const byRole = new Map<string, Note[]>();
   for (const answer of answers) {
     const before = stored.get(answer.questionId);
-    if (answer.via === "skip" || !answer.value?.trim() || (before?.value === answer.value && before.via === answer.via)) continue;
+    if (answer.via === "skip" || !answer.value?.trim()) continue;
     const question = questions.get(answer.questionId)!;
+    // An answer sent again as it was leaves no second note. An all-roles answer can keep its words and change the
+    // roles ticked ("Yes" for one role, then "Yes" for two), so that one is compared role by role, below.
+    if (before?.value === answer.value && before.via === answer.via && question.scope !== "all") continue;
     // A flag answer is about the tailored wording, not a fact about the person: no note.
     if (question.kind === "flag") continue;
     // A confirmed skill goes on every role it was used in ("Used SQL (Yes)"); other answers on their question's role.
@@ -292,6 +296,8 @@ export async function saveAnswers(
       ? acrossNote(question, answer) ?? ""
       : usedIn.length > 0 && question.skill ? `Used ${question.skill} (${answer.value.trim()})` : answer.value.trim();
     for (const roleId of targets) {
+      // A role that already carries this note for this job (ticked before, or in an earlier run) gets no second one.
+      if (across && noted.get(roleId)?.some((note) => note.jobId === run.jobId && note.question === question.text && note.answer === text)) continue;
       const note = NoteSchema.parse({ id: newId(), question: question.text, answer: text, via: [NOTE_VIA[answer.via]],
         askedAt: deps.now().toISOString(), jobId: run.jobId });
       byRole.set(roleId, [...(byRole.get(roleId) ?? []), note]);

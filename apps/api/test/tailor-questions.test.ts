@@ -678,6 +678,16 @@ describe("gap questions: every gap asked once, with the roles it may fit", () =>
     expect(res.status).toBe(200);
     expect(await jobNotes()).toEqual([expect.objectContaining({ roleId: newest.id, answer: "Used Team lead" })]);
 
+    // The same yes with another role ticked: the new role gets its note, the role noted before gets no second one.
+    const again = await call(`/v1/tailor-runs/${runId}/answers`, { answers: [
+      { questionId: lead!.id, value: "Yes", via: "option", use: "used", roleIds: [newest.id, older.id] },
+    ] });
+    expect(again.status).toBe(200);
+    expect((await jobNotes()).map((note) => note.roleId).sort()).toEqual([newest.id, older.id].sort());
+    // Sent once more as it stands: nothing new.
+    await call(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: lead!.id, value: "Yes", via: "option", use: "used", roleIds: [newest.id, older.id] }] });
+    expect(await jobNotes()).toHaveLength(2);
+
     const many: Question[] = Array.from({ length: 12 }, (_, i) => ({ id: `g${i}`, section: "experience", roleId: null, text: `Did you use tool ${i}?`,
       kind: "skill", options: [], reason: "Gap", gap: `k:tool ${i}`, scope: "all", skill: `Tool ${i}` }));
     await memoryTailorRepo("user-a", scores, docs).updateRun(runId, { questions: many });

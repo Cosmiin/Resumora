@@ -98,6 +98,22 @@ describe("the one questions screen", () => {
     expect(screen.getByRole("button", { name: "Tailor my CV" })).toBeDisabled();
   });
 
+  it("opened to change earlier answers, it can be left without sending anything", async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    const { onSubmit } = show([kissflow], { onCancel });
+    expect(screen.getByRole("note")).toHaveTextContent("Sending your answers tailors your CV again from your own wording.");
+    await user.click(screen.getByRole("button", { name: "Back to the result" }));
+    expect(onCancel).toHaveBeenCalled();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("has no way back on a first visit", () => {
+    show([kissflow]);
+    expect(screen.queryByRole("button", { name: "Back to the result" })).toBeNull();
+    expect(screen.queryByRole("note")).toBeNull();
+  });
+
   it("says one thing for one gap", () => {
     show([kissflow]);
     expect(screen.getByRole("heading", { level: 1, name: "The job asks for 1 thing your CV doesn't show" })).toBeInTheDocument();

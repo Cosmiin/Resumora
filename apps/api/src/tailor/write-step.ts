@@ -1,4 +1,4 @@
-import { isRoleSection, stepItems, type CvContent, type JobExtraction, type MatchScore, type TailorRun, type TailorSection } from "@resumora/shared";
+import { isRoleSection, scoredItems, stepItems, type CvContent, type JobExtraction, type MatchScore, type TailorRun, type TailorSection } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError, type LogFn } from "../errors.ts";
@@ -12,6 +12,26 @@ import { jobNotFound } from "./start.ts";
 const MAX_SAVES = 5;
 const NO_CHOICES: AcceptBody = { decisions: [], inferred: [], flags: [] };
 const HEADLINE_WAITS: AcceptBody = { ...NO_CHOICES, decisions: [{ itemId: "headline", keep: false }] };
+
+/**
+ * The Base CV without the notes an earlier yes left on roles the person no longer ticks. A gap question's answer is
+ * kept as a note on each role ticked, and notes are only ever added: when the answer changes, the role that lost its
+ * tick still has the note. The writer must not read it as a fact, so it is left out for this run.
+ */
+function withoutWithdrawn(cv: CvContent, run: TailorRun): CvContent {
+  const answers = new Map((run.answers ?? []).map((answer) => [answer.questionId, answer]));
+  // Each answered gap question, by its wording (a note carries the question's text), with the roles ticked now.
+  const ticked = new Map((run.questions ?? []).flatMap((question) => {
+    const answer = answers.get(question.id);
+    return question.scope === "all" && answer ? [[question.text, new Set(answer.roleIds ?? [])] as const] : [];
+  }));
+  if (ticked.size === 0) return cv;
+  const copy = structuredClone(cv);
+  for (const { item } of scoredItems(copy)) {
+    item.notes = item.notes.filter((note) => note.jobId !== run.jobId || !ticked.has(note.question) || ticked.get(note.question)!.has(item.id));
+  }
+  return copy;
+}
 
 /**
  * One step made and written straight into the tailored CV: its proposals as the step-by-step routes make them, the
@@ -34,7 +54,7 @@ export async function writeStep(
     throw new ApiError(409, "role_not_current", "This role isn't part of this run.");
   }
   const made = section === "layout" ? { proposals: await layoutProposals(deps, { ...input, fromBase: true }), removed: 0 }
-    : await passProposals(deps, { userId: input.userId, run, job: input.job, cv: input.cv, section, roleId });
+    : await passProposals(deps, { userId: input.userId, run, job: input.job, cv: withoutWithdrawn(input.cv, run), section, roleId });
 
   for (let save = 0; save < MAX_SAVES; save++) {
     const doc = run.tailoredCvId ? await deps.tailor.readTailoredCv(run.tailoredCvId) : null;

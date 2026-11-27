@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Answer, Locale, TailorQuestion } from "@resumora/shared";
 import { useT } from "../i18n/t.ts";
-import { roleMeta, type Role } from "./RolePanel.tsx";
+import { roleMeta, type Role } from "./role.ts";
 
 type Use = NonNullable<Answer["use"]>;
 type Pick = { use: Use | null; roleIds: string[] };
@@ -18,6 +18,8 @@ type Props = {
   busy: boolean;
   /** One answer per question; a row left untouched is a skip. */
   onSubmit(answers: Answer[]): void;
+  /** Leaves without sending anything: only when the screen was opened to change earlier answers. */
+  onCancel?(): void;
 };
 
 /** Rows shown at once, and roles shown in a row, before "more". */
@@ -29,7 +31,7 @@ const ROLES = 3;
  * with one tap for "something similar" or "no". A role the CV hints at comes first and says so, but nothing is ticked
  * for the person: a tick is their own statement, and it is what gets written.
  */
-export function GapQuestions({ questions, roles, locale, answers = [], busy, onSubmit }: Props) {
+export function GapQuestions({ questions, roles, locale, answers = [], busy, onSubmit, onCancel }: Props) {
   const t = useT();
   const given = new Map(answers.map((answer) => [answer.questionId, answer]));
   const [picks, setPicks] = useState<Record<string, Pick>>(() => Object.fromEntries(questions.map((question) => {
@@ -58,6 +60,7 @@ export function GapQuestions({ questions, roles, locale, answers = [], busy, onS
   return <section className="tailor-gaps ui-stack">
     <h1 className="ui-title">{t(questions.length === 1 ? "tailor.gaps.titleOne" : "tailor.gaps.titleMany", { n: questions.length })}</h1>
     <p className="ui-lead">{t("tailor.gaps.lead")}</p>
+    {onCancel && <p className="ui-notice" role="note">{t("tailor.gaps.again")}</p>}
     {shown.map((question) => {
       const { use, roleIds } = pick(question.id);
       const suggested = question.suggestedRoleIds ?? [];
@@ -87,6 +90,9 @@ export function GapQuestions({ questions, roles, locale, answers = [], busy, onS
     })}
     {!allRows && questions.length > ROWS && <p><button type="button" className="ui-btn ui-btn--quiet" onClick={() => setAllRows(true)}>
       {t("tailor.gaps.showMore", { n: questions.length - ROWS })}</button></p>}
-    <p className="tailor-gaps-go"><button type="button" className="ui-btn ui-btn--primary" disabled={busy} onClick={submit}>{t("tailor.gaps.go")}</button></p>
+    <p className="tailor-gaps-go">
+      {onCancel && <button type="button" className="ui-btn ui-btn--quiet" disabled={busy} onClick={onCancel}>{t("tailor.gaps.cancel")}</button>}
+      <button type="button" className="ui-btn ui-btn--primary" disabled={busy} onClick={submit}>{t("tailor.gaps.go")}</button>
+    </p>
   </section>;
 }

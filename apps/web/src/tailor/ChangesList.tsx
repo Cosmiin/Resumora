@@ -34,7 +34,8 @@ function textItems(cv: CvContent): Map<string, Texts> {
 }
 const WORDING = ["text", "description", "name", "title", "level"];
 const str = (value: unknown) => (typeof value === "string" ? value : "");
-const roleName = (role: { title: string; company: string }) => [role.title.trim(), role.company.trim()].filter(Boolean).join(" · ");
+/** "Title · Company": how a role is named in the list and on the final page. */
+export const roleName = (role: { title: string; company: string }) => [role.title.trim(), role.company.trim()].filter(Boolean).join(" · ");
 const LIGHT = ["achievements", "courses", "publications", "interests"] as const;
 const lightList = (cv: CvContent, section: string): Array<{ id: string; hidden?: boolean } & Texts> =>
   (section === "achievements" ? cv.awards : (LIGHT as readonly string[]).includes(section) ? cv[section as "courses"] : []) as Array<{ id: string; hidden?: boolean } & Texts>;

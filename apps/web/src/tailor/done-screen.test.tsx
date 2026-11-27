@@ -55,6 +55,7 @@ describe("the finish screen", () => {
     expect(screen.getByRole("button", { name: "Download Word" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Mark as ready" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Change my answer" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Change my answers" })).toBeNull();
   });
 
   it("names a must-have the CV does not show and offers to change the answer", async () => {
@@ -84,12 +85,12 @@ describe("the finish screen", () => {
     expect(screen.getByText("Up from 1. Still missing: Excel.")).toBeInTheDocument();
   });
 
-  it("lists where the points came from when it knows", () => {
-    const router = createMemoryRouter([{ path: "/", element: <DoneScreen jobId="one" docId="cv1" base={base} final={final} job={job}
-      gains={[{ name: "Payroll Lead", points: 12 }, { name: "Skills", points: 7 }]} /> }]);
-    render(<RouterProvider router={router} />);
-    const rows = [...document.querySelectorAll(".tailor-result-from li")].map((row) => row.textContent);
-    expect(rows).toEqual(["Payroll Lead+12", "Skills+7"]);
+  it("offers to change the answers when there were questions", async () => {
+    const user = userEvent.setup();
+    const onAnswers = vi.fn();
+    renderDone({ onAnswers });
+    await user.click(screen.getByRole("button", { name: "Change my answers" }));
+    expect(onAnswers).toHaveBeenCalled();
   });
 
   it("a job with no must-haves just says tailoring is done", () => {

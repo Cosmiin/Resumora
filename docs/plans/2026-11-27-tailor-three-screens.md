@@ -113,5 +113,17 @@ size: ~150 lines added, far more removed
 
 **Acceptance tests** (`three-screens.test.tsx`). Start → questions → answers sent → every step written → finish → the final page; no gap: straight to the wait; a done run: the final page with no request to write; a failed part named on the final page; a deleted job; changing the answers from the final page.
 
+**Rulings made while building.**
+- "Change my answers" on a finished run: the run can't be written again, so sending the answers first calls the existing steering route with the stored steering (the tailored CV goes back to the Base wording, a new run carries the questions and answers over), then sends the answers to that run and runs the wait. Nothing is touched until the answers are sent; the questions screen has "Back to the result".
+- `apps/api/src/tailor/write-step.ts` and its test are touched: an answer is kept as a note on each role ticked, and notes are only ever added. When an answer changes, the role that lost its tick still has the note, and the writer read it as a fact. The step now leaves out, for its run, this job's notes of an answered gap question on roles not ticked now. The note itself stays on the Base CV (removing it needs a database function; not done here).
+- A run with no role step (a re-tailor of Skills or the Summary only) asks no questions: they are about roles.
+- Adjust moved from the "Look back at" line to the bar; it is offered on the questions screen and on the final page.
+- The final page has "Change my answers" among its next steps whenever the run asked questions (not only beside a must-have that is not covered).
+- "Where the points came from" is gone from the final page: there is one score now, not one per step.
+- Removed with their tests: `QuestionCard`, `RoleReview`, `SectionReview`, `SkillsReview`, `SummaryReview`, `LayoutReview`, `LayoutPicture`, `SectionPanel`, `YourAnswers`, `RolePanel` (its `Role` type and `roleMeta` are in `role.ts`), `role-done.ts`, the per-step calls of `tailor-api.ts`, 134 copy keys in each language and the style rules only those screens used. `ui/DiffRow` stays (the UI gallery shows it). The API's per-step routes stay: nothing on the site calls them now, and removing them is its own change.
+- (After the first review.) `apps/api/src/tailor/questions.ts`: an all-roles answer sent again with the same words but other roles ticked ("Yes" for one role, then "Yes" for two) used to be skipped as unchanged, so the role ticked in addition got no note. It is now compared role by role: a role that already carries the note for this job gets no second one, a role newly ticked gets its note.
+- (After a run on the local stack with real AI, 27 Nov.) The final page is centred; the downloads and the next steps sit right under the match, above the list of changes; the wait says "Working out your new match…" once every part is written; each screen starts at its top; the questions screen opened from the result says that sending the answers tailors again from the person's own wording.
+- Seen in that run and not changed here: a gap ticked for a role that has no line to carry it ends as an added skill, and the role stays as written (the writer may only reword; the new line for a confirmed gap is the next plan). The skills step renamed "Business Intelligence" to "Decision Support", marked as a guess; it is applied with Undo and counted under "Still to check".
+
 ## Order and checks
 A1 → A2 → A3 (PR 99, live, unused by the site) → B1 → B2 → B3 → B4 (one PR, live). After Part B the owner tailors the same job once more.

@@ -100,6 +100,28 @@ describe("writing a step straight into the tailored CV", () => {
     expect(await repo().getRun(runId)).toMatchObject({ status: "running", currentSection: "experience", currentRoleId: newer.id });
   });
 
+  it("a role no longer ticked for a gap doesn't hand the writer the note its earlier yes left", async () => {
+    const { runId } = await start();
+    const question = { id: "g1", section: "experience" as const, roleId: null, text: "Did you use KissFlow?", kind: "skill" as const, options: [],
+      reason: "The ad asks for KissFlow.", gap: "k:KissFlow", skill: "KissFlow", scope: "all" as const };
+    // The first answer ticked both roles, so both carry its note; the answer was then changed to the older role only.
+    const note = { id: "n1", question: question.text, answer: "Used KissFlow (Yes)", via: ["pick" as const], askedAt: "2026-11-27T10:00:00.000Z", jobId };
+    await cv.addJobNotes(newer.id, [note]);
+    await cv.addJobNotes(older.id, [{ ...note, id: "n2" }]);
+    await repo().updateRun(runId, { questions: [question], answers: [{ questionId: "g1", value: "Yes", via: "option", use: "used", roleIds: [older.id] }] });
+
+    replies = [proposals(reword(newer.bullets[0]!.id, "Ran accurate payroll for 40 staff")), { results: [] }];
+    expect((await write(runId, "experience", newer.id)).status).toBe(200);
+    expect(JSON.stringify(model.requests)).not.toContain("Used KissFlow");
+
+    const before = model.requests.length;
+    replies = [proposals(reword(older.bullets[0]!.id, "Checked payroll timesheets every week")), { results: [] }];
+    expect((await write(runId, "experience", older.id)).status).toBe(200);
+    expect(JSON.stringify(model.requests.slice(before))).toContain("Used KissFlow");
+    // The note itself stays on the Base CV: only this run's writer doesn't see it.
+    expect((await cv.get()).content.experience[0]!.notes).toHaveLength(1);
+  });
+
   it("two steps written at the same time both end up in the tailored CV", async () => {
     const { runId, docId } = await start();
     // Each reply is picked by what the request holds, since the two steps' model calls interleave.
