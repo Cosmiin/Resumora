@@ -4,7 +4,7 @@ import { memoryCvRepo } from "../cv/memory-repo.ts";
 import { ApiError } from "../errors.ts";
 import { allSpecific, fakeModel, roleWith } from "./fake-model.ts";
 import { memoryInsightsRepo } from "./memory-repo.ts";
-import { proposeShape } from "./shape.ts";
+import { joinsLines, proposeShape } from "./shape.ts";
 
 const vevol = [
   "Managed Shopify and Shopify Plus stores for 5-10 client accounts across international markets.",
@@ -83,6 +83,30 @@ describe("proposeShape", () => {
       { ids: ids(4, 5), text: vevol[4]! },
     ] }));
     expect(await run()).toEqual({ merges: [] });
+  });
+
+  it("drops a merge that is two different lines joined into one long sentence (a real run, 27 Nov 2026)", async () => {
+    const requirements = "Elicited and structured business requirements into development-ready user stories, conducted User Acceptance Testing (UAT), and served as the bridge between business stakeholders and technical implementation.";
+    const dashboards = "Configured operational reporting dashboards using Airtable, Softr, and Make.com to provide data-driven decision support and identify operational bottlenecks.";
+    const security = "Safely managed sensitive employee and payroll data through role-based access, restricted API credentials, and synchronization rules.";
+    const change = "Led change management projects by piloting workflow improvements and retiring manual trackers to ensure consistent operating procedures.";
+    await save(roleWith([requirements, dashboards, security, change, ...vevol.slice(3)]));
+    model = fakeModel(() => ({ merges: [
+      { ids: ids(0, 1), text: "Elicited and structured business requirements into development-ready user stories, conducted User Acceptance Testing (UAT), served as the bridge between business stakeholders and technical implementation, and configured operational reporting dashboards using Airtable, Softr, and Make.com to provide data-driven decision support and identify operational bottlenecks." },
+      { ids: ids(2, 3), text: "Safely managed sensitive employee and payroll data through role-based access, restricted API credentials, and synchronization rules, and led change management projects by piloting workflow improvements and retiring manual trackers to ensure consistent operating procedures." },
+    ] }));
+    expect(await run()).toEqual({ merges: [] });
+  });
+
+  it("keeps a merge of lines that say the same thing: about as long as its longest line (the same run's good merges)", () => {
+    const ownership = "Full ownership of the Shopify ecommerce channel, including detailed monthly reporting to the CEO and business owners, along with ongoing data-driven improvement recommendations.";
+    const kpis = "Tracked KPIs, including traffic, conversions, sales, AOV, and CLTV, and provided clear reports to the CEO and growth team.";
+    expect(joinsLines([ownership, kpis], "Owned the Shopify ecommerce channel, tracking KPIs including traffic, conversions, sales, AOV, and CLTV to provide detailed monthly reports and data-driven improvement recommendations to the CEO and growth team.")).toBe(false);
+    const projects = "Full ownership and management of Shopify ecommerce projects, overseeing successful implementations and launches, optimization, scaling, and ongoing operational maintenance across Romania, Europe, and the United States.";
+    const stakeholders = "Managed projects efficiently and maintained ongoing collaboration with internal and external stakeholders, ensuring alignment with strategic objectives.";
+    expect(joinsLines([projects, stakeholders], "Manage Shopify ecommerce projects across Romania, Europe, and the United States, overseeing implementations, launches, scaling, and maintenance while collaborating with internal and external stakeholders to ensure alignment with strategic objectives.")).toBe(false);
+    // Two lines put end to end are not a merge, whatever joins them.
+    expect(joinsLines([ownership, kpis], `${ownership.slice(0, -1)}, and ${kpis.toLowerCase()}`)).toBe(true);
   });
 
   it("with 6 lines or fewer, keeps only a merge of a repeated line", async () => {
