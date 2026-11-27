@@ -22,3 +22,5 @@ Rulings:
 One low finding, fixed: the name check ran on each model reply on its own, so a retried rename could take the name a first-reply rename already had. It now also runs once over the final list, after the retry is merged in. The fix was reviewed on its own.
 
 cost: reviews 4 agents (one per task on Sonnet, the whole branch and the fix on Opus) · guard denials 0 · no real-AI runs.
+
+Left as it is (ruling): when a flagged rename is asked again and its second answer is dropped as a doubled name, the step still reports one "claim your CV doesn't back up". That count is for the first answer, which did fail a truth check, so it is true.
