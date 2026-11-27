@@ -29,8 +29,11 @@ describe("the one questions screen", () => {
     const first = within(row("Did you use KissFlow?"));
     expect(first.getAllByRole("button").map((b) => b.textContent)).toEqual([
       expect.stringContaining("Business Analyst"), expect.stringContaining("Data Analyst"), expect.stringContaining("Intern"),
-      "2 more roles", "No, but I used something similar", "No",
+      "2 more roles", "No",
     ]);
+    // One way to say no: "something similar" asked nothing more and did the same as "No" (27 Nov, the owner: "How is
+    // 'No, but I used something similar' here?", on "Have you led team leads for 2+ years?").
+    expect(screen.queryByRole("button", { name: /something similar/ })).toBeNull();
     expect(first.queryByRole("button", { pressed: true })).toBeNull();
 
     // A role the CV hints at comes first and says so, with the CV's own words; it is not ticked.
@@ -48,11 +51,11 @@ describe("the one questions screen", () => {
     const first = within(row("Did you use KissFlow?"));
     await user.click(first.getByRole("button", { name: /Business Analyst/ }));
     await user.click(first.getByRole("button", { name: /Intern/ }));
-    await user.click(within(row("Did you monitor ticket queues?")).getByRole("button", { name: "No, but I used something similar" }));
+    await user.click(within(row("Did you monitor ticket queues?")).getByRole("button", { name: "No" }));
     await user.click(screen.getByRole("button", { name: "Tailor my CV" }));
     expect(onSubmit).toHaveBeenCalledWith([
       { questionId: "q1", value: "Yes", via: "option", use: "used", roleIds: ["r1", "r3"] },
-      { questionId: "q2", value: "No", via: "option", use: "similar" },
+      { questionId: "q2", value: "No", via: "option", use: "none" },
       { questionId: "q3", value: null, via: "skip" },
     ]);
   });
@@ -112,6 +115,14 @@ describe("the one questions screen", () => {
     show([kissflow]);
     expect(screen.queryByRole("button", { name: "Back to the result" })).toBeNull();
     expect(screen.queryByRole("note")).toBeNull();
+  });
+
+  it("an earlier 'something similar' opens as No", async () => {
+    const user = userEvent.setup();
+    const { onSubmit, row } = show([kissflow], { answers: [{ questionId: "q1", value: "No", via: "option", use: "similar" }] });
+    expect(within(row("Did you use KissFlow?")).getByRole("button", { name: "No" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Tailor my CV" }));
+    expect(onSubmit).toHaveBeenCalledWith([{ questionId: "q1", value: "No", via: "option", use: "none" }]);
   });
 
   it("says one thing for one gap", () => {

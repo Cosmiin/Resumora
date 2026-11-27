@@ -49,7 +49,6 @@ export const tailorRo: Record<FlowKey, string> = {
   "tailor.voice.start": "Vorbește în loc să scrii",
   "tailor.voice.stop": "Oprește înregistrarea",
 
-  "tailor.across.similar": "Nu, dar am folosit ceva similar",
   "tailor.gaps.titleOne": "Jobul cere un lucru care nu se vede în CV-ul tău",
   "tailor.gaps.titleMany": "Jobul cere {n} lucruri care nu se văd în CV-ul tău",
   "tailor.gaps.lead": "Bifează rolurile în care fiecare e adevărat. În CV ajunge doar ce bifezi.",

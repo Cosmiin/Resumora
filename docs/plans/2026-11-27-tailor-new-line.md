@@ -60,3 +60,16 @@ size: ~15 lines
 
 ## Order and checks
 Task 1 → Task 2 → Task 3 → runs on the local stack with the real AI on the owner's test job (the two ticks of the earlier run) → one PR, live.
+
+## Withdrawn the same day: no line is added to a role
+27 Nov, an hour after it went live, the owner tailored another CV and got five lines on one role: "Used client services.", "Used account management.", "Used budgets.", "Used forecasts.", "Used revenue projections." What caused it, from his run's data and the code:
+- The gap questions are not only about tools ("Have you built and read budgets?"), but an answer was saved as the note "Used + the question's short label" ("Used budgets"), the wording of a tool question.
+- The new line had to name that label and could use only words of the role and of the question. The one sentence that passes is "Used budgets."
+- One new line was allowed per ticked gap with no limit per role, and a ticked gap nothing named was asked for again. Five ticks gave five lines; no existing line was reworded.
+- The same stub ("Used prompt engineering.") was seen in the local runs above and shipped anyway.
+
+**The fix (approved by the owner).** No line is ever added: the `new-bullet` item, the words check and the second ask are removed. The ticked gaps are still named to the writer (`confirmed`), to reword a line that is already about the same work; otherwise the role stays as written. A ticked answer is saved as the question itself with "Yes" ("Have you built and read budgets?" "Yes"). A line added that day can be removed on the final page, and goes when its role is written again. "No, but I used something similar" is gone from the questions screen: it asked nothing more and did the same as "No" (the owner, on "Have you led team leads for 2+ years?": "How is 'No, but I used something similar' here?"); an earlier such answer opens as "No".
+
+**Acceptance tests.** The note is the question with "Yes". `confirmed` reaches the writer of the ticked role only, and the prompt says never to add a bullet. A `new-bullet` the writer sends is dropped. A rewording that names the gap is applied. A line added on 27 Nov can be removed and goes when its role is written again. The questions screen has one "No"; an earlier "similar" opens as "No".
+
+Not part of it: the duplicated "Page speed, navigation, and UX improved." in the same screenshot is in the owner's Base CV as it stands (the tailoring did not touch that line).

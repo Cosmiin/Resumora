@@ -25,7 +25,9 @@ const ModelProposalsSchema = z.object({
 const VerifySchema = z.object({ results: z.array(z.object({ itemId: z.string(), claims: z.array(z.string()) })) });
 
 /**
- * What an all-roles answer says, as a note: "Used KissFlow". Null when neither was used, and for "something similar":
+ * What an all-roles answer says, as the answer of its note: "Yes" (the note carries the question itself: "Have you
+ * built and read budgets?" "Yes"). It used to read "Used budgets", the wording of a tool question, which is wrong for
+ * anything that is not a tool and came back as a line of the CV on 27 Nov. Null when neither was used, and for "something similar":
  * that answer is one tap now, with no tool named and no role ticked, so there is nothing true to note. An older
  * answer that named its tool and roles keeps its note: the person's own tool without the asked one's name, so no
  * check reads it as a source for that tool.
@@ -35,7 +37,7 @@ export function acrossNote(question: TailorQuestion, answer: Answer): string | n
   if (answer.use === "similar") {
     return answer.roleIds?.length ? `Used ${answer.value.trim()} for the kind of work a tool the job names does (not that tool itself)` : null;
   }
-  return `Used ${question.skill ?? question.text}`;
+  return "Yes";
 }
 
 /**
@@ -60,8 +62,6 @@ export function sectionItems(cv: CvContent, section: TailorSection, roleId: stri
       items.set(role.id, { fields: { description, company, title, startDate, endDate }, roleId: role.id });
       for (const bullet of role.bullets) items.set(bullet.id, { fields: { text: bullet.text }, roleId: role.id });
     }
-    // One role of Experience may get a line of its own for a gap the person ticked it for (see `newLines`).
-    if (section === "experience" && roleId && items.has(roleId)) items.set(NEW_BULLET, { fields: { text: "" }, roleId });
   } else if (section === "skills") {
     for (const skill of [...cv.technicalSkills, ...cv.professionalSkills]) items.set(skill.id, { fields: { name: skill.name }, roleId: null });
     items.set("new-skill", { fields: { name: "" }, roleId: null });
@@ -110,16 +110,12 @@ export function lightList(cv: CvContent, section: "achievements" | LightTailorSe
 export const notText = (p: Pick<Proposal, "field">) => p.field === "hidden" || p.field === "order";
 
 /**
- * The item id of a line the writer adds to a role (27 Nov: a role ticked for "prompt engineering" stayed as written,
- * because no line of it was about that work and the writer could only reword). On the tailored CV each such line gets
- * its own id, `new-bullet:<roleId>:<n>`.
+ * The id prefix of a line the tailoring added to a role, `new-bullet:<roleId>:<n>`. Such lines were written for a few
+ * hours on 27 Nov and came out as stubs ("Used budgets.", five on one role), so none is written any more. The prefix
+ * stays so that the ones on tailored CVs made then can be removed, and go when their role is written again.
  */
 export const NEW_BULLET = "new-bullet";
-/** Words that say nothing of their own, so a new line may use them freely. */
-const GLUE = new Set(("and the for with from into onto over under about across within during while when where which that this these those their its our was were has had have been being are "
-  + "use used using work worked working apply applied applying also both each per via "
-  + "pentru prin care din dintre peste sub despre este sunt fost fiind avut cum unde acest aceasta aceste acestor "
-  + "folosit folosind utilizat utilizand lucrat lucrand aplicat").split(" "));
+
 
 /** One skill, however it is spelled: case, accents, hyphens and spaces don't count ("Power-BI" is "power bi"). */
 const sameSkill = (name: string) => name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[\s-]+/g, "");
@@ -225,7 +221,8 @@ export async function passProposals(
     if (!answer.value || !question) return [];
     if (question.scope !== "all") return [{ question: question.text, answer: answer.value }];
     const note = acrossNote(question, answer);
-    return note ? [{ question: "Used in the roles ticked", answer: note }] : [];
+    if (!note) return [];
+    return answer.use === "similar" ? [{ question: "Used in the roles ticked", answer: note }] : [{ question: question.text, answer: "Yes, in the roles ticked" }];
   });
   const ownItems = stepItems(cv, section).filter((item) => item.id === roleId)
     .map((item) => ({ ...item, notes: item.notes.filter((note) => !note.jobId || note.jobId === run.jobId) }));
@@ -240,44 +237,14 @@ export async function passProposals(
       ...item.notes.filter((n) => affirmed(n.answer)).map((n) => `${n.question} ${n.answer}`)]),
   ];
   // A confirmed skill names the roles it was used in: "Used in: Title · Company, Title · Company".
-  // The gaps the person ticked this role for on the questions screen: the only ones a new line may be written for.
+  // The gaps the person ticked this role for on the questions screen: named to the writer, so a line about the same
+  // work is reworded to show them. Never a line of its own.
   const questionOf = new Map((run.questions ?? []).map((question) => [question.id, question]));
   const ticked = section === "experience" && roleId ? (run.answers ?? []).flatMap((answer) => {
     const question = questionOf.get(answer.questionId);
     return question?.scope === "all" && question.skill?.trim() && answer.use === "used" && (answer.roleIds ?? []).includes(roleId)
       ? [{ gap: question.skill.trim(), question: question.text }] : [];
   }) : [];
-  // A new line is built from the role's own words and the words of the question the person said yes to, nothing else.
-  const own = new Set([...texts(ownItems), ...ticked.flatMap((entry) => [entry.gap, entry.question])].flatMap(words).map(stem));
-  const unsupported = (text: string) => [...new Set(words(text).filter((word) => word.length >= 3 && !GLUE.has(word) && !own.has(stem(word))))];
-  /** True when one of the texts names the gap: its words of three letters or more, or all of them when it has none ("AI"). */
-  const names = (gap: string, among: string[]) => {
-    const all = words(gap).map(stem);
-    const needed = all.some((word) => word.length >= 3) ? all.filter((word) => word.length >= 3) : all;
-    return needed.length === 0 || among.some((text) => { const have = new Set(words(text).map(stem)); return needed.every((word) => have.has(word)); });
-  };
-  /**
-   * Which new lines stay: one per ticked gap, and only for a gap that neither a line of the role nor a rewording in
-   * this reply already names (rewording comes first). A line that names no ticked gap is not what a tick allows.
-   * `allowed`: in the second ask, only the gaps still missing, so a gap the first answer covered gets no second line.
-   */
-  function newLines(list: Proposal[], allowed: typeof ticked = ticked): Proposal[] {
-    if (!list.some((p) => p.itemId === NEW_BULLET)) return list;
-    const reworded = new Map(list.filter((p) => p.itemId !== NEW_BULLET).map((p) => [p.itemId, p.text]));
-    const lines = ownItems.flatMap((item) => [reworded.get(item.id) ?? item.description, ...item.bullets.map((bullet) => reworded.get(bullet.id) ?? bullet.text)]);
-    const open = allowed.filter((entry) => !names(entry.gap, lines));
-    const given = new Set<string>();
-    const left: string[] = [];
-    const kept = list.filter((p) => {
-      if (p.itemId !== NEW_BULLET) return true;
-      const entry = open.find((candidate) => !given.has(candidate.gap) && names(candidate.gap, [p.text]));
-      if (!entry) { left.push(p.itemId); return false; }
-      given.add(entry.gap);
-      return true;
-    });
-    if (left.length) deps.log?.({ msg: "tailor new lines left out", section, count: left.length });
-    return kept;
-  }
   const usedIn = new Map<string, string>();
   for (const answer of run.answers ?? []) {
     const question = (run.questions ?? []).find((q) => q.id === answer.questionId);
@@ -297,12 +264,11 @@ export async function passProposals(
   const call = <S extends z.ZodType>(task: "tailor_section" | "tailor_verify", tier: "strong" | "cheap", schema: S, system: string, user: string) =>
     callModel(deps.model, { userId: input.userId, task, tier, schema, system, user, maxOutputTokens: 12000 });
 
-  /** `missing` and `taken`: the second ask for ticked gaps nothing names yet, and the items the first answer already changed. */
-  async function propose(retry: Proposal[], missing: typeof ticked = [], taken: ReadonlySet<string> = new Set()): Promise<Proposal[]> {
+  async function propose(retry: Proposal[]): Promise<Proposal[]> {
     const reply = await call("tailor_section", "strong", ModelProposalsSchema, sectionSystemPrompt(contentSection), sectionUserMessage({
       section, items: sectionData(cv, section, run.jobId, roleId), job: input.job, language: steering!.language,
       steering: steeringText(steering!.steering, cv, isRoleSection(section) ? roleId ?? undefined : undefined), answers, retry,
-      ...(gaps ? { gaps } : {}), ...(ticked.length > 0 ? { confirmed: ticked } : {}), ...(missing.length > 0 ? { missing } : {}),
+      ...(gaps ? { gaps } : {}), ...(ticked.length > 0 ? { confirmed: ticked } : {}),
     }));
     // An item with one editable field (a bullet's text, the summary) takes any field name; other unknown item ids
     // or fields are dropped and logged (ids and fields only); items without a proposal keep the Base CV wording.
@@ -311,8 +277,6 @@ export async function passProposals(
     const unconfirmed: string[] = [];
     const replaced: string[] = [];
     for (const { reason, guesses, ...p } of reply.proposals) {
-      // A line the first answer changed keeps that change: the second ask may only use the others, or add a line.
-      if (taken.has(p.itemId)) continue;
       const fields = Object.keys(items.get(p.itemId)?.fields ?? {});
       const field = fields.includes(p.field) ? p.field : fields.length === 1 ? fields[0]! : null;
       // The wording a line already has is no change (27 Nov: 6 of 7 role "changes" in a trial were lines sent back as
@@ -352,7 +316,7 @@ export async function passProposals(
     if (dropped.length) deps.log?.({ msg: "tailor proposals dropped", section, count: dropped.length, dropped });
     if (unconfirmed.length) deps.log?.({ msg: "tailor guesses dropped", section, count: unconfirmed.length, items: unconfirmed });
     if (replaced.length) deps.log?.({ msg: "tailor skill replacements dropped", section, count: replaced.length, items: replaced });
-    return undoubled(newLines(kept, missing.length > 0 ? missing : ticked));
+    return undoubled(kept);
   }
   // The skills step: the name each skill on the CV has.
   const owners = new Map(section === "skills" ? [...cv.technicalSkills, ...cv.professionalSkills, ...cv.unclearSkills].map((s) => [sameSkill(s.name), s.id]) : []);
@@ -392,11 +356,7 @@ export async function passProposals(
       const pastLine = !!role && !pastRole && before !== undefined && startsInPastTense(before, cv.locale);
       const original = "company" in fields ? fields : undefined;
       const claims = verified.results.filter((result) => result.itemId === p.itemId).flatMap((result) => result.claims);
-      // A new line with a word of its own is sent back once, with the words named.
-      const foreign = p.itemId === NEW_BULLET ? unsupported(p.text) : [];
-      const invented = foreign.length > 0 ? [{ rule: "guess" as const,
-        detail: `These words are not in this role or in the question the person said yes to: ${foreign.join(", ")}. Write the line with their words only, or leave it out.` }] : [];
-      return { ...p, flags: [...checkProposal(p, { sources, original, pastRole, pastLine, locale: steering!.language }), ...claims.map((detail) => ({ rule: "achievement" as const, detail })), ...invented] };
+      return { ...p, flags: [...checkProposal(p, { sources, original, pastRole, pastLine, locale: steering!.language }), ...claims.map((detail) => ({ rule: "achievement" as const, detail }))] };
     });
   }
 
@@ -422,21 +382,6 @@ export async function passProposals(
   } catch (cause) {
     if (cause instanceof ApiError) throw cause;
     throw new ApiError(502, "ai_failed", `Couldn't tailor ${section}. Try again.`);
-  }
-
-  // A gap the person ticked this role for is not passed over: when neither the role's lines nor the changes name it,
-  // the writer is asked once more, for it alone (27 Nov: of three runs with the same ticks, one left the role as written).
-  // What comes back is checked like any change, never replaces a change already made, and is not asked for again.
-  const clean = proposals.filter((p) => p.flags.length === 0);
-  const changed = new Map(clean.filter((p) => p.itemId !== NEW_BULLET).map((p) => [p.itemId, p.text]));
-  const roleLines = [...ownItems.flatMap((item) => [changed.get(item.id) ?? item.description, ...item.bullets.map((bullet) => changed.get(bullet.id) ?? bullet.text)]),
-    ...clean.filter((p) => p.itemId === NEW_BULLET).map((p) => p.text)];
-  const missing = ticked.filter((entry) => !names(entry.gap, roleLines));
-  if (missing.length > 0) {
-    try {
-      const more = (await check(await propose([], missing, new Set(changed.keys())))).filter((p) => p.flags.length === 0);
-      proposals = [...proposals, ...more];
-    } catch { /* the first answer stands */ }
   }
 
   const kept = undoubled(proposals.filter((p) => p.flags.length === 0));

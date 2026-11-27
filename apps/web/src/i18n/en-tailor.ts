@@ -42,7 +42,6 @@ export const tailorEn = {
   "tailor.voice.start": "Talk instead of typing",
   "tailor.voice.stop": "Stop recording",
 
-  "tailor.across.similar": "No, but I used something similar",
   "tailor.gaps.titleOne": "The job asks for 1 thing your CV doesn't show",
   "tailor.gaps.titleMany": "The job asks for {n} things your CV doesn't show",
   "tailor.gaps.lead": "Tick the roles where each one is true. Only what you tick goes on your CV.",
