@@ -193,3 +193,54 @@ describe("the step-by-step routes", () => {
     expect(await repo().getRun(runId)).toMatchObject({ currentRoleId: older.id });
   });
 });
+
+describe("finishing a run written step by step", () => {
+  const finish = (runId: string, token = "token-a") => post(`/v1/tailor-runs/${runId}/finish`, {}, token);
+
+  it("scores the tailored CV once, saves the score and ends the run", async () => {
+    const { runId, docId } = await start();
+    replies = [proposals(reword(newer.bullets[0]!.id, "Ran accurate payroll for 40 staff")), { results: [] }];
+    await write(runId, "experience", newer.id);
+    expect(docs.scoreStale.has(docId)).toBe(true);
+
+    replies = [scoreReply()];
+    const res = await finish(runId);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { run: { status: string; currentSection: string | null }; score: { total: number | null } };
+    expect(body.run).toMatchObject({ status: "done", currentSection: null });
+    expect(typeof body.score.total).toBe("number");
+    expect(model.logged.filter((call) => call.task === "tailor_score")).toHaveLength(1);
+    expect(docs.scoreStale.has(docId)).toBe(false);
+    expect((await tailored(docId)).score).toMatchObject({ total: body.score.total });
+    expect(await repo().getScore(jobId, "tailored", docId)).toMatchObject({ total: body.score.total });
+
+    // Asked again (a second click, a lost reply): the same answer, and no second scoring.
+    const calls = model.requests.length;
+    const again = await (await finish(runId)).json() as { run: { status: string }; score: { total: number | null } };
+    expect(again).toMatchObject({ run: { status: "done" }, score: { total: body.score.total } });
+    expect(model.requests).toHaveLength(calls);
+  });
+
+  it("does not end the run with a score that misses a step written meanwhile", async () => {
+    const { runId, docId } = await start();
+    const doc = await tailored(docId);
+    // While the score is being worked out, another step saves the tailored CV.
+    model = fakeModel(() => {
+      void repo().saveTailoredCv(docId, doc.version, { content: doc.content, review: doc.review ?? {}, score: null, scoreStale: true });
+      return scoreReply();
+    });
+    const res = await finish(runId);
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("version_conflict");
+    expect(await repo().getRun(runId)).toMatchObject({ status: "running" });
+    expect(docs.scoreStale.has(docId)).toBe(true);
+  });
+
+  it("leaves the run open when the score could not be worked out, and is someone else's run for another user", async () => {
+    const { runId } = await start();
+    replies = [{ labels: [], cvSeniority: "mid" }];
+    expect((await finish(runId)).status).toBe(502);
+    expect(await repo().getRun(runId)).toMatchObject({ status: "running", currentSection: "experience" });
+    expect((await finish(runId, "token-b")).status).toBe(404);
+  });
+});

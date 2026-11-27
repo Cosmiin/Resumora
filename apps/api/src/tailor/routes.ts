@@ -18,7 +18,7 @@ import { ensureSameBaseCv } from "./base-changed.ts";
 import { scoreMatch } from "./score.ts";
 import { jobNotFound, startTailoring, tailorLanguages } from "./start.ts";
 import { toneExamples } from "./tone-examples.ts";
-import { writeStep } from "./write-step.ts";
+import { finishRun, writeStep } from "./write-step.ts";
 
 const AnswersBodySchema = z.object({ answers: z.array(AnswerSchema).min(1).max(MAX_RUN_QUESTIONS) });
 const isUuid = (id: string) => z.uuid().safeParse(id).success;
@@ -156,6 +156,13 @@ export function tailorRoutes(deps: {
     return c.json(await writeStep({ model: deps.modelFor(c), tailor: deps.tailorFor(c), cv: deps.cvFor(c), now: deps.now, log: deps.log }, {
       userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, section, roleId,
     }));
+  });
+
+  /** Ends a run whose steps were written with the route above: one score for the whole CV. */
+  app.post("/tailor-runs/:id/finish", async (c) => {
+    const { run, job } = await stepRun(c);
+    if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
+    return c.json(await finishRun({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, { userId: c.get("user").id, run, job: job.extracted }));
   });
 
   /** Going back (BackA): new answers for a finished role, and its proposals made again for review. */

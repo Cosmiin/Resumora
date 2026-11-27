@@ -1,8 +1,8 @@
-import { isRoleSection, stepItems, type CvContent, type JobExtraction, type TailorRun, type TailorSection } from "@resumora/shared";
+import { isRoleSection, stepItems, type CvContent, type JobExtraction, type MatchScore, type TailorRun, type TailorSection } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError, type LogFn } from "../errors.ts";
-import { mergeStep, type AcceptBody } from "./accept.ts";
+import { mergeStep, scoreTailored, type AcceptBody } from "./accept.ts";
 import { layoutProposals } from "./layout-pass.ts";
 import type { TailorRepo } from "./repo.ts";
 import { passProposals } from "./section-pass.ts";
@@ -44,4 +44,28 @@ export async function writeStep(
     if (saved === "ok") return { changed: merged.changed, removed: made.removed };
   }
   throw new ApiError(409, "version_conflict", "This tailored CV was saved somewhere else first.");
+}
+
+/**
+ * Ends a run whose steps were written straight into the tailored CV: scores the CV once as it stands, saves the score
+ * (the CV is up to date with it again) and marks the run done. Asked again for a run already done, it answers with
+ * the score the CV has, without scoring a second time.
+ */
+export async function finishRun(
+  deps: { model: ModelDeps; tailor: TailorRepo },
+  input: { userId: string; run: TailorRun; job: JobExtraction },
+): Promise<{ run: TailorRun; score: MatchScore }> {
+  const { run } = input;
+  const doc = run.tailoredCvId ? await deps.tailor.readTailoredCv(run.tailoredCvId) : null;
+  if (!doc) throw jobNotFound();
+  if (run.status === "done" && doc.score) return { run, score: doc.score };
+  const score = await scoreTailored(deps, { userId: input.userId, cv: doc, job: input.job });
+  // A step saved while the score was being worked out is not in it: the run stays open and the caller finishes again.
+  if ((await deps.tailor.readTailoredCv(doc.id))?.version !== doc.version) {
+    throw new ApiError(409, "version_conflict", "This tailored CV was saved somewhere else first.");
+  }
+  await deps.tailor.saveScore(run.jobId, "tailored", doc.id, score);
+  const done = await deps.tailor.updateRun(run.id, { status: "done", currentSection: null, currentRoleId: null });
+  if (!done) throw jobNotFound();
+  return { run: done, score };
 }

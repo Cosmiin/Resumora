@@ -33,14 +33,14 @@ The existing run and accept routes behave as before.
 
 ### Task A2: One request finishes the run and scores once
 ```
-files: apps/api/src/tailor/routes.ts, apps/api/src/tailor/accept.ts
-new_files: apps/api/test/tailor-finish.test.ts
+files: apps/api/src/tailor/routes.ts, apps/api/src/tailor/write-step.ts, apps/api/test/tailor-write-step.test.ts
+new_files: none
 deps: A1
 size: ~40 lines
 ```
 **Goal.** `POST /v1/tailor-runs/:id/finish`: scores the tailored CV as it stands (one `tailor_score` call), saves the score, clears the stale mark, sets the run done. Calling it again returns the same result without scoring again. Answers `{ run, score }`.
 
-**Acceptance tests.** One score call; the run is done and has no current step; the second call makes no model call; a run of another user answers 404.
+**Acceptance tests.** One score call; the run is done and has no current step; the second call makes no model call; a run of another user answers 404; when the score cannot be worked out the run stays open.
 
 ### Task A3: One request asks about every gap, with the roles it may fit
 ```
