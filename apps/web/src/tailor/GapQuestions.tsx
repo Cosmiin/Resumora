@@ -75,6 +75,10 @@ export function GapQuestions({ questions, roles, locale, answers = [], busy, onS
       const heading = `gap-${question.id}`;
       return <div key={question.id} role="group" aria-labelledby={heading} className="ui-sheet tailor-gaprow">
         <h2 className="ui-heading" id={heading}>{question.text}</h2>
+        {question.need && <p className="ui-small tailor-gap-why">
+          <b>{t(`tailor.gaps.need.${question.need}`)}</b>{" "}
+          {question.adLine ? <q lang="und">{question.adLine}</q> : question.skill}
+        </p>}
         {question.hint && suggested.length > 0 && <p className="ui-small ui-muted">{t("tailor.gaps.hint", { hint: question.hint })}</p>}
         <div className="answer-opts">
           {visible.map((r) => <button key={r.id} type="button" className="answer-opt" aria-pressed={use === "used" && roleIds.includes(r.id)} onClick={() => toggle(question.id, r.id)}>

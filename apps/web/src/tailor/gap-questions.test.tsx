@@ -125,6 +125,20 @@ describe("the one questions screen", () => {
     expect(onSubmit).toHaveBeenCalledWith([{ questionId: "q1", value: "No", via: "option", use: "none" }]);
   });
 
+  it("says why each question is asked: what the ad needs it for, in the ad's own words", () => {
+    const { row } = show([
+      { ...kissflow, need: "keyword", adLine: "…across the tool stack, including Zendesk, Kissflow, Docusign…" },
+      { ...queues, need: "must", adLine: "Configure and maintain operational reporting dashboards, including queue health." },
+      question("q3", "Startups", { need: "nice" }),
+      question("q4", "Zendesk"),
+    ]);
+    expect(row("Did you use KissFlow?")).toHaveTextContent("The ad says: …across the tool stack, including Zendesk, Kissflow, Docusign…");
+    expect(row("Did you monitor ticket queues?")).toHaveTextContent("A must-have in the ad: Configure and maintain operational reporting dashboards, including queue health.");
+    // No sentence found in the ad: what it is named, without a quote. A question from before this: nothing.
+    expect(row("Did you use Startups?")).toHaveTextContent("A nice-to-have in the ad: Startups");
+    expect(row("Did you use Zendesk?")).not.toHaveTextContent("in the ad");
+  });
+
   it("says one thing for one gap", () => {
     show([kissflow]);
     expect(screen.getByRole("heading", { level: 1, name: "The job asks for 1 thing your CV doesn't show" })).toBeInTheDocument();

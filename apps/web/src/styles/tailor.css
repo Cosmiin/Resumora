@@ -127,6 +127,8 @@
 .tailor-gaprow { display: grid; gap: var(--space-3); }
 .tailor-gaprow .answer-opt { font-size: var(--text-small, 13px); padding: 5px 12px; }
 .tailor-gap-hinted { opacity: 0.8; font-style: italic; }
+.tailor-gap-why { margin: 0; color: var(--color-muted); }
+.tailor-gap-why b { color: var(--color-ink); font-weight: var(--weight-semibold); }
 .tailor-gaps-go { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-4); }
 .tailor-wait-count { margin: 0; text-align: center; font-weight: var(--weight-semibold); }
 

@@ -703,3 +703,21 @@ describe("the gap questions prompt", () => {
     expect(gapSystemPrompt).toContain('never with "Which", "What" or "How"');
   });
 });
+
+describe("gap questions say why they are asked", () => {
+  it("each comes back with what the ad needs it for, also when it was stored before; the ad's sentence when the ad has one", async () => {
+    const runId = await startRun();
+    replies = [[{ text: "Did you use Kubernetes?", skill: "Kubernetes", reason: "Gap", gap: "r0", roleIds: [], hint: null }] as unknown as ModelQuestion[]];
+    const ask = async () => ((await (await call(`/v1/tailor-runs/${runId}/gap-questions`)).json()) as { questions: Question[] }).questions;
+    // This job's stored text is one letter, so there is no sentence to quote (the quoting itself: ad-line.test.ts).
+    const [first] = await ask();
+    expect(first).toMatchObject({ need: "must" });
+    expect(first).not.toHaveProperty("adLine");
+    // Stored without it (a run from before): it is added on the way out.
+    const repo = memoryTailorRepo("user-a", scores, docs);
+    const run = (await repo.getRun(runId))!;
+    expect(run.questions![0]).toMatchObject({ need: "must" });
+    await repo.updateRun(runId, { questions: run.questions!.map(({ need: _need, ...rest }) => rest) });
+    expect((await ask())[0]).toMatchObject({ need: "must" });
+  });
+});
