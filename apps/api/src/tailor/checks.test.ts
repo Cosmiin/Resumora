@@ -128,7 +128,8 @@ describe.each([
     });
     const proposals = [
       { itemId: role.bullets[0]!.id, field: "text" }, { itemId: role.id, field: "description" },
-    ].map((target) => ({ ...target, text: "Coordinate partner onboarding", inferred: false, reason: null, guesses: null }));
+    // Not the wording either line has: a line sent back as it stands is no proposal at all.
+    ].map((target) => ({ ...target, text: "Coordinate partner onboarding weekly", inferred: false, reason: null, guesses: null }));
     const replies = [{ proposals }, { results: [] }, { proposals }, { results: [] }];
     const model = fakeModel(() => replies.shift());
     const result = await passProposals({ model: model.deps, tailor }, { userId: "user-a", run, job, cv, section, roleId: role.id });

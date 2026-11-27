@@ -685,3 +685,11 @@ describe("gap questions: every gap asked once, with the roles it may fit", () =>
     expect(all.status).toBe(200);
   });
 });
+
+describe("the gap questions prompt", () => {
+  it("asks only what ticking roles can answer", async () => {
+    const { gapSystemPrompt } = await import("../src/tailor/question-prompts.ts");
+    expect(gapSystemPrompt).toContain('Start it with "Did you" or "Have you"');
+    expect(gapSystemPrompt).toContain('never with "Which", "What" or "How"');
+  });
+});

@@ -167,7 +167,7 @@ describe("section pass", () => {
     await cv.save({ ...base, experience: [two] }, 1);
     const [first, second] = two.bullets;
     replies = [proposals(reword("Ran payroll on Kubernetes", { itemId: first!.id }), reword("Filed taxes on time", { itemId: second!.id })),
-      { results: [] }, proposals(reword("Ran payroll for 40 staff", { itemId: first!.id })), { results: [] }];
+      { results: [] }, proposals(reword("Ran payroll for 40 staff monthly", { itemId: first!.id })), { results: [] }];
     const body = await (await runSection()).res.json() as { proposals: Proposal[] };
     expect(body.proposals.map((p) => p.itemId)).toEqual([first!.id, second!.id]);
   });

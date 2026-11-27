@@ -24,3 +24,26 @@ open: none
 
 - Ruling: the note saved for a ticked role stays "Used <short name>", also for a practice that is not a tool. The plan's idea of another wording for those was dropped: it added a rule for no gain the trial could show.
 - The same requirement categories as the all-roles questions are asked (skill, experience, other); a missing degree, language or certificate is not a row, since no role can be ticked for it.
+
+## Part A: whole-branch review — pass, no findings
+
+## Part A: trial with the real AI (27 Nov), and two fixes it led to
+A temporary probe (not committed) ran the new path on two fictional pairs: every gap asked in one call, every step written at the same time, one score at the end. The probe ticked each suggested role and said no to the rest.
+
+| Long-career CV (6 roles, 11 steps) | First run | After the fixes |
+|---|---|---|
+| Questions | 2, in 1.9 s | 2, in 1.3 s |
+| All steps written at once | 5.5 s | 8.0 s |
+| Headline and order | 1.3 s | 1.5 s |
+| One score | 3.1 s | 2.6 s |
+| Score | 61 → 90 | 61 → 100 |
+
+Run from the build machine against in-memory storage: live timings will differ. Both questions came with the role that hints at them and the CV's own words ("Coordinated the response to an account-permissions incident"). No step's changes were lost when all were written at once.
+
+Fixed after the first run (commit after 40ecad7, reviewed on its own, no findings):
+- **A line sent back as it stands is no change.** Of 7 role "changes" stored, 6 had the Base wording. Such a proposal is now left out before the checks, in every section. Nine existing tests fed unchanged wording as a proposal; their fixtures now send a changed wording and assert the same things.
+- **Questions that ticking roles can answer.** One read "Which helpdesk software have you used for reporting?". The prompt now asks for "Did you" or "Have you".
+
+Still true: the score moves between runs of the same CV and job (the weak-support pair scored 59, then 0), so score lifts say little.
+
+cost: reviews 5 agents (three tasks on Sonnet, the whole branch and the trial fixes on Opus) · guard denials 0 · real-AI runs: 3 probes, well under $1.
