@@ -48,6 +48,7 @@
 
 /* Answer box: pick, type or speak */
 .answer-box { display: grid; gap: 8px; }
+.answer-rule { margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-4); border-left: 3px solid var(--color-coach); border-radius: var(--radius-field); background: var(--color-paper-veil); color: var(--color-ink); font-size: var(--text-base); font-weight: var(--weight-semibold); }
 .answer-opts { display: flex; flex-wrap: wrap; gap: 6px; }
 .answer-opt { font: inherit; font-size: 12.5px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--sage-300); background: var(--white); color: var(--pine-800); cursor: pointer; }
 .answer-opt[aria-pressed="true"] { background: var(--pine-600); border-color: var(--pine-600); color: var(--white); }
