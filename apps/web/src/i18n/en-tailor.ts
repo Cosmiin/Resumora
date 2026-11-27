@@ -63,8 +63,6 @@ export const tailorEn = {
   "tailor.across.roles": "Tick the roles where you used it",
   "tailor.across.similar": "No, but I used something similar",
   "tailor.across.none": "No, and nothing similar",
-  "tailor.across.what": "What did you use?",
-  "tailor.across.similarRoles": "In which roles did you use it?",
   "tailor.what.skills.eyebrow": "Your skills, as they are on your CV now",
   "tailor.what.skills.title": "Skills",
   "tailor.what.skills.other": "Other",

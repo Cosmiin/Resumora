@@ -418,4 +418,49 @@ describe("section pass", () => {
     expect(system).not.toContain("exact keywords inside natural sentences");
     expect(system).not.toContain("Condense old");
   });
+
+  describe("the skills step never gives two skills the same name", () => {
+    const skills = [{ id: "s1", name: "Make.com" }, { id: "s2", name: "Zapier" }, { id: "s3", name: "Make / Integromat" }, { id: "s4", name: "Power-BI" }];
+    const rename = (itemId: string, text: string): ModelProposal => ({ itemId, field: "name", text, inferred: false });
+    const added = (text: string) => ({ itemId: "new-skill", field: "name", text, inferred: true, reason: "Shown in: Payroll Specialist · Acme Payroll" } as ModelProposal);
+    const names = async () => ((await (await runSection("skills")).res.json()) as { proposals: Proposal[]; removed: number });
+    // The names used below stand in the CV, so the tool check has nothing to say about them.
+    beforeEach(() => cv.save({ ...base, technicalSkills: skills, experience: [{ ...role, description: "Built workflow automation tools and Power BI reports" }] }, 1));
+
+    it("keeps the first of several renames to one name; the other skills keep their names", async () => {
+      replies = [proposals(rename("s1", "Workflow Automation Tools"), rename("s2", "workflow automation tools"), rename("s3", "Workflow-Automation Tools"))];
+      const body = await names();
+      expect(body.proposals.map((p) => [p.itemId, p.text])).toEqual([["s1", "Workflow Automation Tools"]]);
+      expect(body.removed).toBe(0);
+      expect(log).toHaveBeenCalledWith({ msg: "tailor duplicate skills dropped", section: "skills", count: 2, items: ["s2", "s3"] });
+      expect(JSON.stringify(log.mock.calls)).not.toContain("orkflow");
+    });
+
+    it("drops a rename to another skill's name, and keeps a skill's own name in another spelling", async () => {
+      replies = [proposals(rename("s2", "power bi"), rename("s4", "Power BI"))];
+      expect((await names()).proposals.map((p) => [p.itemId, p.text])).toEqual([["s4", "Power BI"]]);
+    });
+
+    it("drops a new skill the CV already has, and the second of two new skills with one name", async () => {
+      replies = [proposals(added("zapier"), added("Payroll"), added("Pay-roll"))];
+      const body = await names();
+      expect(body.proposals.map((p) => [p.itemId, p.text])).toEqual([["new-skill", "Payroll"]]);
+      expect(body.removed).toBe(0);
+    });
+
+    it("a retried rename can't take the name a first-reply rename already has", async () => {
+      // "Kubernetes" is a tool no source has, so the first rename of Zapier is flagged and asked again.
+      replies = [proposals(rename("s1", "Workflow Automation Tools"), rename("s2", "Kubernetes")), { results: [] },
+        proposals(rename("s2", "workflow automation tools")), { results: [] }];
+      expect((await names()).proposals.map((p) => [p.itemId, p.text])).toEqual([["s1", "Workflow Automation Tools"]]);
+    });
+
+    it("says so in the skills prompt", async () => {
+      replies = [proposals()];
+      await runSection("skills");
+      const system = JSON.stringify(model.requests[0]);
+      expect(system).toContain("Never give two skills the same name");
+      expect(system).toContain("A tool's, product's or technology's own name stays as it is");
+    });
+  });
 });

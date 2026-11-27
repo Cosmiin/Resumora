@@ -25,12 +25,16 @@ const ModelProposalsSchema = z.object({
 const VerifySchema = z.object({ results: z.array(z.object({ itemId: z.string(), claims: z.array(z.string()) })) });
 
 /**
- * What an all-roles answer says, as a note: "Used KissFlow", or for something similar the person's own tool without
- * the asked one's name, so no check reads it as a source for that tool. Null when neither was used.
+ * What an all-roles answer says, as a note: "Used KissFlow". Null when neither was used, and for "something similar":
+ * that answer is one tap now, with no tool named and no role ticked, so there is nothing true to note. An older
+ * answer that named its tool and roles keeps its note: the person's own tool without the asked one's name, so no
+ * check reads it as a source for that tool.
  */
 export function acrossNote(question: TailorQuestion, answer: Answer): string | null {
   if (answer.via === "skip" || answer.use === "none" || !answer.value?.trim()) return null;
-  if (answer.use === "similar") return `Used ${answer.value.trim()} for the kind of work a tool the job names does (not that tool itself)`;
+  if (answer.use === "similar") {
+    return answer.roleIds?.length ? `Used ${answer.value.trim()} for the kind of work a tool the job names does (not that tool itself)` : null;
+  }
   return `Used ${question.skill ?? question.text}`;
 }
 
@@ -102,6 +106,9 @@ export function lightList(cv: CvContent, section: "achievements" | LightTailorSe
 }
 /** A hide or an order is not CV text: nothing in it is a claim, so the truth checks skip it. */
 export const notText = (p: Pick<Proposal, "field">) => p.field === "hidden" || p.field === "order";
+
+/** One skill, however it is spelled: case, accents, hyphens and spaces don't count ("Power-BI" is "power bi"). */
+const sameSkill = (name: string) => name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[\s-]+/g, "");
 
 /** An answer that says no ("No", "Nu", "Never") confirms nothing. */
 const NEGATIVE = /^\s*(no|nu|not|never|none|nope|niciodat|n-am)\b/i;
@@ -276,7 +283,28 @@ export async function passProposals(
     }
     if (dropped.length) deps.log?.({ msg: "tailor proposals dropped", section, count: dropped.length, dropped });
     if (unconfirmed.length) deps.log?.({ msg: "tailor guesses dropped", section, count: unconfirmed.length, items: unconfirmed });
-    return kept;
+    return undoubled(kept);
+  }
+  // The skills step: the name each skill on the CV has.
+  const owners = new Map(section === "skills" ? [...cv.technicalSkills, ...cv.professionalSkills, ...cv.unclearSkills].map((s) => [sameSkill(s.name), s.id]) : []);
+  /**
+   * Two skills never end with one name (27 Nov: three tools were each renamed "Workflow Automation Tools"): a rename
+   * to another skill's name, or to a name an earlier proposal gives, is dropped and the skill keeps its own; so is a
+   * new skill the CV has or an earlier proposal gives. Run on each reply, and again once the retry is merged in.
+   */
+  function undoubled(list: Proposal[]): Proposal[] {
+    if (section !== "skills") return list;
+    const given = new Set<string>();
+    const doubled: string[] = [];
+    const single = list.filter((p) => {
+      const name = sameSkill(p.text);
+      const owner = owners.get(name);
+      if (given.has(name) || (owner !== undefined && owner !== p.itemId)) { doubled.push(p.itemId); return false; }
+      given.add(name);
+      return true;
+    });
+    if (doubled.length) deps.log?.({ msg: "tailor duplicate skills dropped", section, count: doubled.length, items: doubled });
+    return single;
   }
   async function check(all: Proposal[]): Promise<Proposal[]> {
     const proposals = all.filter((p) => !notText(p));
@@ -323,7 +351,7 @@ export async function passProposals(
     throw new ApiError(502, "ai_failed", `Couldn't tailor ${section}. Try again.`);
   }
 
-  const kept = proposals.filter((p) => p.flags.length === 0);
+  const kept = undoubled(proposals.filter((p) => p.flags.length === 0));
   // Proposals on flagged items that didn't come back clean from the retry, including ones the retry left out.
   const removed = Math.max(0, firstFlagged - kept.filter((p) => flagged.has(p.itemId)).length);
   // A project keeps at most two bullets: rewordings beyond the first two bullet texts are dropped (those bullets keep
