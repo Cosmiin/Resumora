@@ -61,7 +61,7 @@ const r2 = role("r2", { company: "Beta" });
 const cv: CvContent = { ...emptyCv("en"), experience: [r1, r2] };
 const ready = (r: Experience, score: number, over: Partial<RoleResult> = {}): RoleScoreState => ({ state: "ready", result: result(r, score, over) });
 
-function Harness({ initial, onAction, onClose = () => {}, extra, start = cv, onScore }: { initial: Map<string, RoleScoreState>; onAction?(a: CvAction): void; onClose?(): void; extra?: string; start?: CvContent; onScore?(r: RoleResult): void }) {
+function Harness({ initial, onAction, onClose = () => {}, extra, start = cv, onScore, autoStart, live }: { initial: Map<string, RoleScoreState>; onAction?(a: CvAction): void; onClose?(): void; extra?: string; start?: CvContent; onScore?(r: RoleResult): void; autoStart?: boolean; /** A score the path puts is shown, as the editor does. */ live?: boolean }) {
   const [state, apply] = useReducer(cvReducer, start);
   const [scores, setScores] = useState(initial);
   return (
@@ -69,7 +69,8 @@ function Harness({ initial, onAction, onClose = () => {}, extra, start = cv, onS
       <button type="button" onClick={() => setScores(new Map([
         ["r1", ready(state.experience[0]!, 88, extra ? { roleQuestions: [{ id: "rq9", text: extra, options: [], kind: "role", topic: "other" }] } : {})],
         ["r2", ready(state.experience[1]!, 80, { questions: [], roleQuestions: [] })]]))}>Rescore</button>
-      <EnrichPath cv={state} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose} onScore={onScore}
+      <EnrichPath cv={state} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose} autoStart={autoStart}
+        onScore={(r) => { onScore?.(r); if (live) setScores((m) => new Map(m).set(r.roleId, { state: "ready", result: r })); }}
         dispatch={(a) => { onAction?.(a); apply(a); }} />
     </>
   );
@@ -498,6 +499,7 @@ describe("the short path", () => {
       await userEvent.click(screen.getByRole("button", { name: "Start" }));
       await userEvent.click(await screen.findByRole("button", { name: "Merge all and continue" }));
       expect(await screen.findByText("Companies step")).toBeInTheDocument();
+      await waitFor(() => expect(onScore).toHaveBeenCalled());
       const changes = [
         { id: "merge:r1b2", kind: "bullet", bulletId: "r1b2", text: mergedText },
         { id: "remove:r1b3", kind: "remove", bulletId: "r1b3" },
@@ -520,8 +522,68 @@ describe("the short path", () => {
       await userEvent.click(screen.getByRole("button", { name: "Start" }));
       await userEvent.click(await screen.findByRole("button", { name: "Merge all and continue" }));
       expect(await screen.findByText("Companies step")).toBeInTheDocument();
-      expect(actions.some((a) => a.type === "applyRoleChanges" && a.roleId === "r1")).toBe(true);
+      await waitFor(() => expect(actions.some((a) => a.type === "applyRoleChanges" && a.roleId === "r1")).toBe(true));
       expect(onScore).not.toHaveBeenCalled();
+    });
+
+    it("the companies show at once while the merges are still being checked; the questions wait for the check", async () => {
+      let finish!: (value: unknown) => void;
+      api.checkChanges.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+      const actions: CvAction[] = [];
+      // The check's score asks about the merged line; the score from before Shape asks something else.
+      const afterShape: RoleResult = { ...predicted(), questions: [{ bulletId: "r1b2", text: "How many clients after the merge?", options: [], kind: "detail" }], roleQuestions: [] };
+      render(<Harness initial={shapeScores()} start={start} onAction={(a) => actions.push(a)} live />);
+      await userEvent.click(screen.getByRole("button", { name: "Start" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Merge all and continue" }));
+      // No waiting screen: the next step is there before the check answers, and the CV is not changed yet.
+      expect(screen.getByText("Companies step")).toBeInTheDocument();
+      expect(actions.some((a) => a.type === "applyRoleChanges")).toBe(false);
+      await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+      expect(await screen.findByRole("heading", { name: "Updating your scores…" })).toBeInTheDocument();
+      expect(screen.queryByText(/^Budget:/)).toBeNull();
+      finish({ result: afterShape, kept: [], held: [] });
+      // The questions are picked from the scores the check put, not from the ones the tools step saw.
+      expect(await screen.findByText("Budget: How many clients after the merge?")).toBeInTheDocument();
+      expect(actions.some((a) => a.type === "applyRoleChanges" && a.roleId === "r1")).toBe(true);
+    });
+
+    it("with the check done before the tools are, the questions follow the tools with no waiting screen", async () => {
+      render(<Harness initial={shapeScores()} start={start} />);
+      await userEvent.click(screen.getByRole("button", { name: "Start" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Merge all and continue" }));
+      await waitFor(() => expect(api.checkChanges).toHaveBeenCalled());
+      await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+      expect(await screen.findByText(/^Budget:/)).toBeInTheDocument();
+    });
+  });
+
+  describe("opened from an import", () => {
+    it("shows the first step at once, with no start screen, when every role is scored", async () => {
+      render(<Harness initial={scores()} autoStart />);
+      expect(await screen.findByText("Companies step")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
+    });
+
+    it("waits for the scores without a Start button or a number, then goes on by itself", async () => {
+      render(<Harness initial={new Map([["r1", ready(r1, 60)], ["r2", { state: "scoring" }]])} autoStart />);
+      expect(screen.getByRole("heading", { name: "Reading your CV…" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Skip for now" })).toBeEnabled();
+      await userEvent.click(screen.getByRole("button", { name: "Rescore" }));
+      expect(await screen.findByText("Companies step")).toBeInTheDocument();
+      expect(screen.queryByText(/Your CV:/)).toBeNull();
+    });
+
+    it("the end still shows the score before and after", async () => {
+      render(<Harness initial={scores()} autoStart />);
+      await userEvent.click(await screen.findByRole("button", { name: "Companies done" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Answer all" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Rescore" }));
+      // (60*3 + 70*2) / 5 = 64 before; (88*3 + 80*2) / 5 = 84.8 after.
+      expect(await screen.findByRole("heading", { name: "Your CV: 64 → 85" })).toBeInTheDocument();
     });
   });
 

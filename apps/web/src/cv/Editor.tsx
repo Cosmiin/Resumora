@@ -28,7 +28,7 @@ import { FocusOpenProvider, type FocusTarget } from "./enrich/focus-context.ts";
 import { FocusMode } from "./enrich/FocusMode.tsx";
 import { RoleRun } from "./enrich/RoleRun.tsx";
 import { ProjectRun, isProjectTarget } from "./enrich/ProjectRun.tsx";
-import { EnrichPath } from "./enrich/EnrichPath.tsx";
+import { EnrichPath, averageScore, strengthWeights } from "./enrich/EnrichPath.tsx";
 import { PathSteps } from "./enrich/PathStart.tsx";
 import { CvFacts, isBlankCv, useStartTemplate } from "./CvFacts.tsx";
 import { useSearchParams } from "react-router";
@@ -104,6 +104,8 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   // so the questions are ready when "Start with the questions" is pressed.
   const [ahead, setAhead] = useState<Ahead | null>(null);
   const [prepared, setPrepared] = useState<Prepared | null>(null);
+  // The path opened straight from an import: that screen was its start.
+  const [pathFromImport, setPathFromImport] = useState(false);
   const roleScores = useRoleScores({ cv: isTailored ? NO_ROLES : content, status, ahead });
   const scores = isTailored ? undefined : roleScores.scores;
   const retry = roleScores.retry;
@@ -122,6 +124,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   }, [params, setParams]);
   const closePath = useCallback(() => {
     setPathOpen(false);
+    setPathFromImport(false);
     setPrepared(null);
     requestAnimationFrame(() => {
       if (document.activeElement === document.body) focusPage();
@@ -288,6 +291,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
         setAhead(null);
         setPrepared(null);
       }}
+      score={(ahead && roleScores.aheadScores && averageScore(roleScores.aheadScores, strengthWeights(ahead.cv))) ?? undefined}
       onFound={(cv) => {
         if (gradedItems(cv).length === 0) return;
         setAhead({ importId, cv });
@@ -298,8 +302,10 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
         clearOpened();
         setImportId(null);
         setAhead(null);
-        if (next === "questions") setPathOpen(true);
-        else {
+        if (next === "questions") {
+          setPathFromImport(true);
+          setPathOpen(true);
+        } else {
           // The CV may be edited before the questions are started: the steps then ask for themselves.
           setPrepared(null);
           setQuestionsWaiting(cv.content.experience.length > 0);
@@ -415,7 +421,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
         </Dialog>
       )}
       {pathOpen && !focusTarget && !historyOpen && !isTailored && (
-        <EnrichPath cv={content} dispatch={dispatch} scores={roleScores.scores} waitForSave={waitForSave} onClose={closePath} onScore={roleScores.put} prepared={prepared} />
+        <EnrichPath cv={content} dispatch={dispatch} scores={roleScores.scores} waitForSave={waitForSave} onClose={closePath} onScore={roleScores.put} prepared={prepared} autoStart={pathFromImport} />
       )}
       {/* A whole role to improve gets the run of questions; one bullet (✨) and "Make it stand out" keep the short flow. */}
       {/* A project gets its own short flow instead of the role run. */}
