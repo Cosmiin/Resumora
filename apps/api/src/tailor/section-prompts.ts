@@ -44,6 +44,7 @@ Editable fields: each bullet is its own item, itemId = the bullet's id, field "t
   skills: `Reword skill names toward the job's exact keywords, most relevant first (return proposals in that order).
 You may add job-relevant skills the CV, notes or answers support, as itemId "new-skill", field "name", with inferred true.
 A skill name is a short label of at most 3 words, never a phrase or sentence.
+Never give two skills the same name, and never rename a skill to a name another skill on the CV already has. A tool's, product's or technology's own name stays as it is (Make.com, Zapier): never replace it with a category. A category the job asks for may be proposed once, as a new skill, when the CV supports it.
 For each new skill set reason to one short line saying where the CV shows it, naming the role as "Title · Company" when it comes from one (for example "Shown in: Business Analyst · Emedi"). Set reason to null for reworded skills that aren't guesses.`,
   summary: `Rewrite the summary for this job so it describes the CV's experience and skills. Return one proposal with itemId "summary" and field "summary".
 Under guesses, list each phrase of it that is a reasonable inference rather than stated: its exact text as written in the summary, and a reason naming its basis. Set guesses to [] when nothing is guessed.`,

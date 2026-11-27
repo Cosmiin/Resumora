@@ -103,6 +103,9 @@ export function lightList(cv: CvContent, section: "achievements" | LightTailorSe
 /** A hide or an order is not CV text: nothing in it is a claim, so the truth checks skip it. */
 export const notText = (p: Pick<Proposal, "field">) => p.field === "hidden" || p.field === "order";
 
+/** One skill, however it is spelled: case, accents, hyphens and spaces don't count ("Power-BI" is "power bi"). */
+const sameSkill = (name: string) => name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[\s-]+/g, "");
+
 /** An answer that says no ("No", "Nu", "Never") confirms nothing. */
 const NEGATIVE = /^\s*(no|nu|not|never|none|nope|niciodat|n-am)\b/i;
 const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
@@ -243,9 +246,22 @@ export async function passProposals(
     const kept: Proposal[] = [];
     const dropped: { itemId: string; field: string }[] = [];
     const unconfirmed: string[] = [];
+    // The skills step: the name each skill on the CV has, and the names this reply has already given.
+    const owners = new Map(section === "skills" ? [...cv.technicalSkills, ...cv.professionalSkills, ...cv.unclearSkills].map((s) => [sameSkill(s.name), s.id]) : []);
+    const given = new Set<string>();
+    const doubled: string[] = [];
     for (const { reason, guesses, ...p } of reply.proposals) {
       const fields = Object.keys(items.get(p.itemId)?.fields ?? {});
       const field = fields.includes(p.field) ? p.field : fields.length === 1 ? fields[0]! : null;
+      // Two skills never end with one name (27 Nov: three tools were each renamed "Workflow Automation Tools"): a rename
+      // to another skill's name, or to a name already given, is dropped and the skill keeps its own; so is a new skill
+      // the CV has or the reply already proposed.
+      if (section === "skills" && field && p.text.trim()) {
+        const name = sameSkill(p.text);
+        const owner = owners.get(name);
+        if (given.has(name) || (owner !== undefined && owner !== p.itemId)) { doubled.push(p.itemId); continue; }
+        given.add(name);
+      }
       // A guess or a new skill keeps the reason naming its basis; a plain rewording has none.
       const used = p.itemId === "new-skill" ? usedIn.get(p.text.trim().toLowerCase()) : undefined;
       const why = used ? { reason: used } : (p.inferred || p.itemId === "new-skill") && reason?.trim() ? { reason: reason.trim() } : {};
@@ -275,6 +291,7 @@ export async function passProposals(
       else if (!field) dropped.push({ itemId: p.itemId, field: p.field });
     }
     if (dropped.length) deps.log?.({ msg: "tailor proposals dropped", section, count: dropped.length, dropped });
+    if (doubled.length) deps.log?.({ msg: "tailor duplicate skills dropped", section, count: doubled.length, items: doubled });
     if (unconfirmed.length) deps.log?.({ msg: "tailor guesses dropped", section, count: unconfirmed.length, items: unconfirmed });
     return kept;
   }
