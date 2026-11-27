@@ -4,7 +4,7 @@ import { emptyCv, fingerprint, type CvContent, type Experience, type RoleResult 
 const api = vi.hoisted(() => ({ reportFailure: vi.fn(), improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 
-import { changeActions, createLimiter, prepareRoleChanges, toChanges, type Change } from "./prepare.ts";
+import { changeActions, createLimiter, prepareRoleChanges, toChanges, withPlacedChanges, type Change } from "./prepare.ts";
 
 const role: Experience = {
   id: "r1", company: "Acme", title: "Analyst", location: "", startDate: "2020-01", endDate: "", current: true, description: "Old.",
@@ -159,6 +159,44 @@ describe("createLimiter", () => {
     expect(most).toBe(3);
     // r2 starts while r1 is still under way: one queue for both.
     expect(order.indexOf("r2:2b1")).toBeLessThan(order.indexOf("end r1:b3"));
+  });
+});
+
+describe("withPlacedChanges", () => {
+  const own: Change[] = [
+    { id: "bullet:b3", kind: "bullet", bulletId: "b3", before: "Helped.", after: "Helped the sales team." },
+    { id: "new:p1", kind: "new", before: "", after: "Built a dashboard." },
+  ];
+
+  it("a placed line replaces the role's own change for that line, and the text of the new line it was sent as", () => {
+    const sent = toChanges(own);
+    const out = withPlacedChanges(own, sent, [
+      { id: "a1", kind: "bullet", bulletId: "b3", text: "Helped the sales team of 6." },
+      { id: "a2", kind: "bullet", bulletId: sent[1]!.id, text: "Built a dashboard in Tableau." },
+    ], role);
+    expect(out).toEqual([
+      { id: "bullet:b3", kind: "bullet", bulletId: "b3", before: "Helped.", after: "Helped the sales team of 6." },
+      { id: "new:p1", kind: "new", before: "", after: "Built a dashboard in Tableau." },
+    ]);
+  });
+
+  it("a line not changed before becomes a change in the role's line order; a description leads; a new line comes last", () => {
+    const sent = toChanges(own);
+    const out = withPlacedChanges(own, sent, [
+      { id: "a1", kind: "bullet", bulletId: "b1", text: "Did reports in Excel." },
+      { id: "a2", kind: "description", text: "Acme makes anvils." },
+      { id: "a3", kind: "new", text: "Trained two juniors." },
+      { id: "a4", kind: "bullet", bulletId: "gone", text: "Nothing to hang this on." },
+    ], role);
+    expect(out.map((c) => [c.kind, c.before, c.after])).toEqual([
+      ["description", "Old.", "Acme makes anvils."],
+      ["bullet", "Did reports.", "Did reports in Excel."],
+      ["bullet", "Helped.", "Helped the sales team."],
+      ["new", "", "Built a dashboard."],
+      ["new", "", "Trained two juniors."],
+    ]);
+    // The list given is not touched.
+    expect(own).toHaveLength(2);
   });
 });
 

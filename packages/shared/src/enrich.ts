@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { MAX_LONG_TEXT, type Experience, type Locale } from "./cv.ts";
+import { MAX_LONG_TEXT, RoleTopicSchema, type Experience, type Locale, type RoleTopic } from "./cv.ts";
+import { TOOLS_NOTE } from "./tools-note.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
 export const SCORE_POLICY = "score/12";
@@ -20,17 +21,26 @@ export const MAX_QUESTIONS = 20;
 /** Company, purpose and tools, plus at most 5 more. */
 export const MAX_ROLE_QUESTIONS = 8;
 
-/**
- * What a role question is about. The first three are always covered unless the CV or notes already say it.
- * The next four are the conditional parameters: asked when the reviewer cannot tell, or when the page leaves them out.
- */
-export const ROLE_TOPICS = ["company", "purpose", "tools", "leadership", "seniority", "people", "domain", "other"] as const;
 /** The role topics that are conditional coverage parameters. */
 export const CONDITIONAL_TOPICS: readonly RoleTopic[] = ["leadership", "seniority", "people", "domain"];
 /** Role topics whose answers never move the score (score/10): the path asks them only when nothing else is left. */
 export const UNSCORED_TOPICS: readonly RoleTopic[] = ["purpose", ...CONDITIONAL_TOPICS];
-export const RoleTopicSchema = z.enum(ROLE_TOPICS);
-export type RoleTopic = z.infer<typeof RoleTopicSchema>;
+
+const TOOLS_QUESTIONS: ReadonlySet<string> = new Set(Object.values(TOOLS_NOTE).map((n) => n.question));
+/**
+ * The topics a role's enrichment answers already cover: a question about one of them is not asked again, whatever its
+ * wording (owner, 27 Nov 2026). "other" never counts: it is not one topic. A tools note saved before notes carried a
+ * topic is known by its question.
+ */
+export function answeredTopics(role: Pick<Experience, "notes">): Set<RoleTopic> {
+  const topics = new Set<RoleTopic>();
+  for (const note of role.notes) {
+    if (note.jobId !== undefined) continue;
+    if (note.topic && note.topic !== "other") topics.add(note.topic);
+    else if (TOOLS_QUESTIONS.has(note.question)) topics.add("tools");
+  }
+  return topics;
+}
 
 export const GradeSchema = z.enum(["missing", "partial", "specific"]);
 export type Grade = z.infer<typeof GradeSchema>;

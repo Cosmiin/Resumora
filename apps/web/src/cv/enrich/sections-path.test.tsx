@@ -45,6 +45,7 @@ vi.mock("./FocusMode.tsx", async (orig) => {
 const api = vi.hoisted(() => ({ reportFailure: vi.fn(),
   suggestAchievements: vi.fn(), getSkillSuggestions: vi.fn(), getScores: vi.fn(), scoreRole: vi.fn(),
   improveBullet: vi.fn(), brainDump: vi.fn(), roleFacts: vi.fn(), roleDescription: vi.fn(), createVoiceSession: vi.fn(),
+  placeAnswersOnCv: vi.fn(() => Promise.resolve({ changes: [] })),
 }));
 vi.mock("./enrich-api.ts", () => api);
 

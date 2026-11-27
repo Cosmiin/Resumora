@@ -1,4 +1,4 @@
-import { BRAIN_DUMP_QUESTION, CONDITIONAL_TOPICS, questionKey, type Question, type RoleQuestion, type RoleResult } from "@resumora/shared";
+import { BRAIN_DUMP_QUESTION, CONDITIONAL_TOPICS, questionKey, type Question, type RoleQuestion, type RoleResult, type RoleTopic } from "@resumora/shared";
 
 /** A role's questions are answered in one run of at most this many; the rest wait behind "A few more questions". */
 export const RUN_MAX = 6;
@@ -21,9 +21,10 @@ export const itemQuestion = (item: RunItem) => (item.kind === "box" ? BRAIN_DUMP
  * Every question a role's score leaves open, in the order a run asks them: the opening box of a thin role, what is
  * missing from the page (company, purpose, tools), up to two quick checks, the lines (weakest first, as the score
  * sorts them), then anything else about the role and the checks that did not fit. Questions already answered
- * (`answered` holds their keys) and repeats are left out. The first RUN_MAX are one run.
+ * (`answered` holds their keys) and repeats are left out, and so is a question about the role on a topic the role's
+ * notes already cover (`known`: the path asked the company or the tools its own way). The first RUN_MAX are one run.
  */
-export function buildRun(result: RoleResult | undefined, opts: { thin: boolean; answered: ReadonlySet<string> }): RunItem[] {
+export function buildRun(result: RoleResult | undefined, opts: { thin: boolean; answered: ReadonlySet<string>; known?: ReadonlySet<RoleTopic> }): RunItem[] {
   const seen = new Set(opts.answered);
   const fresh = (text: string) => {
     const key = questionKey(text);
@@ -31,7 +32,7 @@ export function buildRun(result: RoleResult | undefined, opts: { thin: boolean; 
     seen.add(key);
     return true;
   };
-  const role = (result?.roleQuestions ?? []).filter((q) => fresh(q.text)).map((question): RunItem => ({ key: `role:${question.id}`, kind: "role", question }));
+  const role = (result?.roleQuestions ?? []).filter((q) => !opts.known?.has(q.topic) && fresh(q.text)).map((question): RunItem => ({ key: `role:${question.id}`, kind: "role", question }));
   const topicOf = (item: RunItem) => (item.kind === "role" ? item.question.topic : null);
   const core = (["company", "purpose", "tools"] as const).flatMap((topic) => role.filter((item) => topicOf(item) === topic));
   const checks = role.filter((item) => CONDITIONAL_TOPICS.includes(topicOf(item)!));

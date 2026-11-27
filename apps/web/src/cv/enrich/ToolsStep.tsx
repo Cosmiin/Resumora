@@ -117,7 +117,7 @@ export function ToolsStep({ cv, prepared, onDone }: { cv: CvContent; prepared?: 
       const names = columns.filter((c) => mine.has(norm(c)));
       // Every ticked tool is in columns (see there), so names holds every tick.
       saved.push({ roleId: role.id, note: {
-        id: newId(), question: t("enrich.path.tools.note"), answer: names.length ? names.join(", ") : t("enrich.path.tools.none"), via: ["pick"], askedAt,
+        id: newId(), question: t("enrich.path.tools.note"), answer: names.length ? names.join(", ") : t("enrich.path.tools.none"), via: ["pick"], askedAt, topic: "tools",
       } });
     }
     onDone(saved);

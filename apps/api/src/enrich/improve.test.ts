@@ -19,6 +19,8 @@ let grade: ModelScore;
 let store: MemoryInsightsStore;
 
 const input = () => ({ roleId: role.id, bulletId: role.bullets[0]!.id, fingerprint: fingerprint(role, "en") });
+/** What the writer of the line was sent. */
+const writerMessage = () => (model.requests.find((r) => JSON.stringify(r).includes("Target bullet"))!.messages as { content: string }[])[1]!.content;
 const post = (body: unknown = input(), auth = headers) =>
   app.request("/v1/enrich/improve-bullet", { method: "POST", headers: auth, body: JSON.stringify(body) });
 
@@ -121,6 +123,38 @@ describe("POST /v1/enrich/improve-bullet", () => {
     expect(user).toContain(`${role.bullets[0]!.id} (grade 45): contribution: partial, clarity: specific, specificity: missing, impact: missing`);
     expect(user).not.toContain(`${role.bullets[1]!.id} (grade`);
     expect(user).toContain("Keep every part at least as good as now, and write every line to reach specific on all five parts");
+  });
+
+  it("gives the writer this line's answers and the free ones; of another line's answer only the question; nothing ticked or told about the whole role", async () => {
+    const note = (question: string, answer: string, about: object = {}) =>
+      ({ id: `n${question.length}`, question, answer, via: ["type" as const], askedAt: "2026-11-27T10:00:00.000Z", ...about });
+    role = { ...role, notes: [
+      note("How many payslips a month?", "About 40 payslips", { bulletId: role.bullets[0]!.id }),
+      note("How many contracts did you check?", "6–10 contracts a week", { bulletId: role.bullets[1]!.id }),
+      note("Tell us about this role", "I also trained the new hires."),
+      note("Which tools did you use?", "Sage, Excel", { topic: "tools" }),
+      note("What was this role for?", "Keeping pay correct for the factory staff", { topic: "purpose" }),
+    ] };
+    await save();
+    await post();
+    const user = writerMessage();
+    expect(user).toContain(`Answers about the target bullet (question and answer): [{"question":"How many payslips a month?","answer":"About 40 payslips"}]`);
+    expect(user).toContain(`Answers about the whole role (question and answer): [{"question":"Tell us about this role","answer":"I also trained the new hires."}]`);
+    expect(user).toContain(`Questions already answered elsewhere in this role: ["How many contracts did you check?","Which tools did you use?","What was this role for?"]`);
+    // Facts the line must not carry are not sent at all.
+    expect(user).not.toContain("6–10 contracts");
+    expect(user).not.toContain("Sage, Excel");
+    expect(user).not.toContain("factory staff");
+  });
+
+  it("drops a rewrite that carries a number from an answer given about another line", async () => {
+    role = { ...role, notes: [{
+      id: "n1", question: "How many contracts did you check?", answer: "6–10 contracts a week", via: ["type"], askedAt: "2026-11-27T10:00:00.000Z", bulletId: role.bullets[1]!.id,
+    }] };
+    await save();
+    answer("Prepared payroll files for 6–10 contracts a week.");
+    const body = await (await post()).json();
+    expect(body).toMatchObject({ needsDetail: true });
   });
 
   it("offers a better bullet and promotes its prediction after saving without another model call", async () => {

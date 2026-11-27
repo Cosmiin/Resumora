@@ -76,7 +76,7 @@ export function CompaniesStep({ cv, prepared, onDone }: { cv: CvContent; prepare
       const text = (proposal ?? typed[row.key] ?? "").trim().slice(0, MAX_LONG_TEXT);
       if (!text) continue;
       for (const role of row.roles) {
-        saved.push({ roleId: role.id, note: { id: newId(), question: companyQuestion(row.name), answer: text, via: [proposal ? "pick" : "type"], askedAt } });
+        saved.push({ roleId: role.id, note: { id: newId(), question: companyQuestion(row.name), answer: text, via: [proposal ? "pick" : "type"], askedAt, topic: "company" } });
       }
     }
     onDone(saved);

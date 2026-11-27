@@ -24,12 +24,24 @@ export const YearMonthSchema = z
 
 export const BulletSchema = z.object({ id, text: text() }).strict();
 
+/**
+ * What a role question is about. The first three are always covered unless the CV or notes already say it.
+ * The next four are the conditional parameters: asked when the reviewer cannot tell, or when the page leaves them out.
+ */
+export const ROLE_TOPICS = ["company", "purpose", "tools", "leadership", "seniority", "people", "domain", "other"] as const;
+export const RoleTopicSchema = z.enum(ROLE_TOPICS);
+export type RoleTopic = z.infer<typeof RoleTopicSchema>;
+
 /** The person's answer to a question about a role. Stored hidden in the CV, never rendered. */
 export const NoteSchema = z
   .object({
     id,
     question: text(MAX_TEXT),
     answer: text(MAX_LONG_TEXT),
+    /** The line the question was about, when it was about one: its answer belongs to that line, not to the others. */
+    bulletId: id.optional(),
+    /** What a question about the whole role was about: a topic answered once is not asked again in other words. */
+    topic: RoleTopicSchema.optional(),
     /** How the answer was given: a tapped option, typed words, or voice. */
     via: z.array(z.enum(["pick", "type", "voice"])).min(1).max(3),
     askedAt: z.iso.datetime(),

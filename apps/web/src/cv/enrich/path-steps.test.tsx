@@ -178,7 +178,7 @@ describe("ToolsStep", () => {
     await done();
     const saved: Saved = onDone.mock.calls[0]![0];
     expect(saved).toHaveLength(1);
-    expect(saved[0]).toMatchObject({ roleId: "b", note: { question: "Which tools did you use?", answer: "SAP", via: ["pick"] } });
+    expect(saved[0]).toMatchObject({ roleId: "b", note: { question: "Which tools did you use?", answer: "SAP", via: ["pick"], topic: "tools" } });
   });
 
   it("a role with no written line is not shown and gets no note", async () => {

@@ -36,6 +36,15 @@ beforeEach(async () => {
 });
 
 describe("placeAnswers", () => {
+  it("tells the model which line an answer was given about, and only for a line still in the role", async () => {
+    const base = roleWith(["Managed online stores.", "Ran discount campaigns."], { description: "Ecommerce agency." });
+    await save({ ...base, notes: [{ ...stores, bulletId: base.bullets[0]!.id }, { ...boss, bulletId: "removed-line" }] });
+    await run();
+    const answers = JSON.parse(userMessage().split("<answers>\n")[1]!.split("\n</answers>")[0]!) as { question: string; line?: string }[];
+    expect(answers.find((a) => a.question === stores.question)).toMatchObject({ line: role.bullets[0]!.id });
+    expect(answers.find((a) => a.question === boss.question)).not.toHaveProperty("line");
+  });
+
   it("makes no model call when no note answers this round's questions", async () => {
     expect(await run([], ["What did you build?"])).toEqual({ changes: [] });
     expect(model.requests).toHaveLength(0);

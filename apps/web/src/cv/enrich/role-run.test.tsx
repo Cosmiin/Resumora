@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { emptyCv, fingerprint, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
 import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
 
-const api = vi.hoisted(() => ({ reportFailure: vi.fn(), improveBullet: vi.fn(), brainDump: vi.fn(), roleFacts: vi.fn(), scoreRole: vi.fn(), roleDescription: vi.fn(), createVoiceSession: vi.fn() }));
+const api = vi.hoisted(() => ({ reportFailure: vi.fn(), improveBullet: vi.fn(), brainDump: vi.fn(), roleFacts: vi.fn(), scoreRole: vi.fn(), roleDescription: vi.fn(), createVoiceSession: vi.fn(), placeAnswersOnCv: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 
 import { RoleRun } from "./RoleRun.tsx";
@@ -77,6 +77,7 @@ beforeEach(() => {
   api.scoreRole.mockImplementation(() => Promise.reject(new Error("unavailable")));
   api.roleDescription.mockResolvedValue({ text: NEW_DESCRIPTION, keywords: [] });
   api.brainDump.mockResolvedValue({ proposals: [], roleBefore: null, roleAfterAll: null });
+  api.placeAnswersOnCv.mockResolvedValue({ changes: [] });
   api.improveBullet.mockImplementation(({ bulletId }: { bulletId: string }) => Promise.resolve(bulletId === "b1" ? improved("b1", NEW_B1) : improved("b2", NEW_B2)));
 });
 
@@ -92,6 +93,66 @@ describe("the start of a role", () => {
     expect(within(dialog).getByText("69")).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "Skip this role" }));
     expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not ask the company or the tools again when the path already has those answers", async () => {
+    const told: Experience = { ...role, notes: [
+      { id: "n1", question: "What does Nordlane Logistics do?", answer: "Parcel delivery for online shops.", via: ["pick"], askedAt: "2026-11-27T00:00:00Z", topic: "company" },
+      { id: "n2", question: "Which tools did you use?", answer: "Excel, SAP", via: ["pick"], askedAt: "2026-11-27T00:00:00Z", topic: "tools" },
+    ] };
+    const asking: RoleResult = { ...result, fingerprint: fingerprint(told, "en"), roleQuestions: [
+      { id: "rq1", text: "What is Nordlane Logistics's business?", options: [], kind: "role", topic: "company" },
+      { id: "rq3", text: "What tools, software, or methods did you use?", options: ["Excel", "SAP"], kind: "role", topic: "tools" },
+      { id: "rq2", text: "Did anyone report to you in this role?", options: ["No", "1–5 people", "6–20", "20+"], kind: "role", topic: "leadership" },
+    ] };
+    render(<Harness initialRole={told} roleResult={asking} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(screen.getByRole("heading", { name: "Did anyone report to you in this role?" })).toBeInTheDocument();
+    await answer("1–5 people");
+    expect(screen.getByRole("heading", { name: "What changed after you trained them?" })).toBeInTheDocument();
+  });
+
+  it("what the answers say that no line took is placed once, on the line it belongs to, and shown to approve", async () => {
+    // The step that sees the whole role puts the tool on the report line, which no rewrite had changed.
+    api.improveBullet.mockImplementation(({ bulletId }: { bulletId: string }) => Promise.resolve(bulletId === "b1" ? improved("b1", NEW_B1) : { needsDetail: true, nextQuestion: null }));
+    api.placeAnswersOnCv.mockResolvedValue({ changes: [{ id: "answer1", kind: "bullet", bulletId: "b2", text: "Built the weekly delivery report in Excel." }] });
+    render(<Harness roleResult={{ ...result, roleQuestions: [{ id: "rq3", text: "Which tools did you use here?", options: ["Excel", "SAP"], kind: "role", topic: "tools" }] }} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await answer("Excel");
+    await answer("Fewer planning mistakes");
+    expect(await screen.findByText("Built the weekly delivery report in Excel.")).toBeInTheDocument();
+    expect(api.placeAnswersOnCv).toHaveBeenCalledTimes(1);
+    const sent = api.placeAnswersOnCv.mock.calls[0]![0] as { roleId: string; questions: string[]; changes: { kind: string; bulletId?: string; text: string }[] };
+    expect(sent.roleId).toBe("r1");
+    expect(sent.questions).toEqual(["Which tools did you use here?", "What changed after you trained them?"]);
+    // The rewrites already made go with the request, so a fact is not placed twice.
+    expect(sent.changes).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "bullet", bulletId: "b1", text: NEW_B1 })]));
+  });
+
+  it("the placing step gets this run's answers only, not the ones the role already held", async () => {
+    const told: Experience = { ...role, notes: [
+      { id: "old1", question: "What does Nordlane Logistics do?", answer: "Parcel delivery for online shops.", via: ["pick"], askedAt: "2026-11-20T00:00:00Z", topic: "company" },
+    ] };
+    render(<Harness initialRole={told} roleResult={{ ...result, fingerprint: fingerprint(told, "en"), roleQuestions: [result.roleQuestions[1]!] }} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await answer("1–5 people");
+    await answer("Fewer planning mistakes");
+    await screen.findByRole("heading", { name: "Here is the role as it will read" });
+    const sent = api.placeAnswersOnCv.mock.calls[0]![0] as { questions: string[] };
+    expect(sent.questions).toEqual(["Did anyone report to you in this role?", "What changed after you trained them?"]);
+  });
+
+  it("an answer is saved with what it is about: the role topic, or the line", async () => {
+    const actions: CvAction[] = [];
+    render(<Harness onAction={(a) => actions.push(a)} roleResult={{ ...result, roleQuestions: [result.roleQuestions[1]!] }} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await answer("1–5 people");
+    await answer("Fewer planning mistakes");
+    const notes = actions.flatMap((a) => (a.type === "setNote" ? [a.note] : []));
+    expect(notes[0]).toMatchObject({ question: "Did anyone report to you in this role?", topic: "leadership" });
+    expect(notes[0]).not.toHaveProperty("bulletId");
+    expect(notes[1]).toMatchObject({ question: "What changed after you trained them?", bulletId: "b1" });
+    expect(notes[1]).not.toHaveProperty("topic");
   });
 
   it("names the company next to the role in the top bar while it asks", async () => {

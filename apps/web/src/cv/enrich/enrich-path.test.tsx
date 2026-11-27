@@ -153,6 +153,34 @@ describe("the short path", () => {
     expect(await screen.findByRole("heading", { name: "Your CV: 64 → 85" })).toBeInTheDocument();
   });
 
+  it("an answer is saved with the line or the role topic it was about, and a topic already answered is not asked again", async () => {
+    const actions: CvAction[] = [];
+    // The role already says whether anyone reported to the person, in other words than the question waiting.
+    const told = role("r1", { notes: [{ ...note("Did you lead people?", "No"), topic: "leadership" }] });
+    render(<Harness initial={new Map([["r1", ready(told, 60)], ["r2", ready(r2, 70, { questions: [], roleQuestions: [] })]])}
+      start={{ ...cv, experience: [told, r2] }} onAction={(a) => actions.push(a)} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Companies done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    expect(await screen.findByText("Budget: What changed in r1?")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Answer all" }));
+    const saved = actions.flatMap((a) => (a.type === "setNote" ? [a.note] : [])).find((n) => n.question === "What changed in r1?");
+    expect(saved).toMatchObject({ bulletId: "r1b1" });
+    expect(saved).not.toHaveProperty("topic");
+  });
+
+  it("a question about the role is saved with its topic", async () => {
+    const actions: CvAction[] = [];
+    render(<Harness initial={scores()} onAction={(a) => actions.push(a)} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Companies done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Answer all" }));
+    const saved = actions.flatMap((a) => (a.type === "setNote" ? [a.note] : [])).find((n) => n.question === "Did anyone report to you in r1?");
+    expect(saved).toMatchObject({ topic: "leadership" });
+    expect(saved).not.toHaveProperty("bulletId");
+  });
+
   it("8 more questions starts another round without asking a question twice", async () => {
     render(<Harness initial={scores()} extra="Which teams did you work with in r1?" />);
     await userEvent.click(screen.getByRole("button", { name: "Start" }));

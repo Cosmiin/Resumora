@@ -92,13 +92,38 @@ deps: Task 4
 size: 250
 ```
 
-## Part C: nothing asked twice, nothing written five times (model calls; needs a real-AI trial)
+## Part C: nothing asked twice, nothing written five times (model calls; tried with the real AI)
 
-## Task 6: The per-role questions repeat nothing
-Goal: a role's own run leaves out a company or tools question when the role already has that answer (the path's
-company note, the tools note, a description), whatever its wording. A follow-up question does not ask for the fact the
-question before it on the same line asked for.
+## Task 6: A note says what it is about; a topic answered once is not asked again
+Goal: a note may carry the line its question was about (`bulletId`) or the role topic (`topic`). The path's company
+and tools notes, the budget's answers, a held line's answer and a role's own run all save it. A role's own run and the
+path's budget leave out a question about the role on a topic the role's notes already cover, whatever its wording (the
+run of 27 Nov asked "What tools, software, or methods did you use?" right after the tools step).
+Acceptance tests: the schema takes both fields; `answeredTopics`; `buildRun` leaves out a known topic; the role run
+skips company and tools already answered and saves what each answer is about; the path saves what each answer is about
+and does not ask an answered topic.
+```scope
+files: packages/shared/src/cv.ts, packages/shared/src/enrich.ts, packages/shared/src/*.test.ts, apps/web/src/cv/enrich/run.ts, apps/web/src/cv/enrich/useRoleRun.ts, apps/web/src/cv/enrich/RoleScoreList.tsx, apps/web/src/cv/enrich/CompaniesStep.tsx, apps/web/src/cv/enrich/ToolsStep.tsx, apps/web/src/cv/enrich/EnrichPath.tsx, apps/web/src/cv/enrich/*.test.ts, apps/web/src/cv/enrich/*.test.tsx
+new_files: none
+deps: none
+size: 200
+```
 
 ## Task 7: One answer lands once
-Goal: when a role is rewritten from answers, a fact from one answer goes on the line it belongs to (or the
-description), not on every line. Tried on a real run before it is published.
+Goal: when a line is rewritten, its writer gets the answers given about that line and the free answers about the
+role; of the answers given about other lines or on a role topic it gets only the questions (so it does not ask them
+again), never the facts. A number from an answer about another line is refused on this line. What a line's writer does
+not take (a tool ticked for the whole role, the team, a free answer) is placed once by the step that sees the whole
+role (`use-answers`), which now also runs at the end of a role's own run; that step is told which line an answer was
+about and that a fact goes in one place only.
+Acceptance tests: the writer's message groups the answers as above; a rewrite with another line's number is dropped;
+`use-answers` names the line; the role run sends its changes and questions to the placing step and shows what it
+placed; `withPlacedChanges`.
+Trial: `eval/enrich/once.eval.ts`, a role modelled on the run of 27 Nov, every line rewritten, counting the lines each
+answer's fact ends up in.
+```scope
+files: apps/api/src/enrich/focus-prompts.ts, apps/api/src/enrich/rewrite.ts, apps/api/src/enrich/use-answers.ts, apps/api/src/enrich/*.test.ts, apps/web/src/cv/enrich/prepare.ts, apps/web/src/cv/enrich/useRoleRun.ts, apps/web/src/cv/enrich/*.test.ts, apps/web/src/cv/enrich/*.test.tsx
+new_files: apps/api/eval/enrich/once.eval.ts
+deps: Task 6
+size: 300
+```
