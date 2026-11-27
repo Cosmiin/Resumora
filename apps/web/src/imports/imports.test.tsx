@@ -438,6 +438,9 @@ describe("the start of the base CV flow", () => {
     await within(dialog).findByRole("heading", { name: "We found 1 role" });
     // Nothing is replaced, so nothing is said about History.
     expect(within(dialog).queryByText("Your current CV is kept in History, so you can go back.")).toBeNull();
+    // The score is not known yet: no number, and its place is kept so nothing moves when it arrives.
+    expect(within(dialog).queryByText(/Your CV:/)).toBeNull();
+    expect(dialog.querySelector(".import-score")).toBeEmptyDOMElement();
     await user.click(within(dialog).getByRole("button", { name: "Start with the questions" }));
     expect(importsApi.applyImport).toHaveBeenCalledWith("imp-1", 1);
     expect(await screen.findByRole("dialog", { name: "Enrich your CV" })).toBeInTheDocument();

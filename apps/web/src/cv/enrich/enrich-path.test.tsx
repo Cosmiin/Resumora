@@ -61,7 +61,7 @@ const r2 = role("r2", { company: "Beta" });
 const cv: CvContent = { ...emptyCv("en"), experience: [r1, r2] };
 const ready = (r: Experience, score: number, over: Partial<RoleResult> = {}): RoleScoreState => ({ state: "ready", result: result(r, score, over) });
 
-function Harness({ initial, onAction, onClose = () => {}, extra, start = cv, onScore, autoStart }: { initial: Map<string, RoleScoreState>; onAction?(a: CvAction): void; onClose?(): void; extra?: string; start?: CvContent; onScore?(r: RoleResult): void; autoStart?: boolean }) {
+function Harness({ initial, onAction, onClose = () => {}, extra, start = cv, onScore, autoStart, live }: { initial: Map<string, RoleScoreState>; onAction?(a: CvAction): void; onClose?(): void; extra?: string; start?: CvContent; onScore?(r: RoleResult): void; autoStart?: boolean; /** A score the path puts is shown, as the editor does. */ live?: boolean }) {
   const [state, apply] = useReducer(cvReducer, start);
   const [scores, setScores] = useState(initial);
   return (
@@ -69,7 +69,8 @@ function Harness({ initial, onAction, onClose = () => {}, extra, start = cv, onS
       <button type="button" onClick={() => setScores(new Map([
         ["r1", ready(state.experience[0]!, 88, extra ? { roleQuestions: [{ id: "rq9", text: extra, options: [], kind: "role", topic: "other" }] } : {})],
         ["r2", ready(state.experience[1]!, 80, { questions: [], roleQuestions: [] })]]))}>Rescore</button>
-      <EnrichPath cv={state} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose} onScore={onScore} autoStart={autoStart}
+      <EnrichPath cv={state} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose} autoStart={autoStart}
+        onScore={(r) => { onScore?.(r); if (live) setScores((m) => new Map(m).set(r.roleId, { state: "ready", result: r })); }}
         dispatch={(a) => { onAction?.(a); apply(a); }} />
     </>
   );
@@ -529,7 +530,9 @@ describe("the short path", () => {
       let finish!: (value: unknown) => void;
       api.checkChanges.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
       const actions: CvAction[] = [];
-      render(<Harness initial={shapeScores()} start={start} onAction={(a) => actions.push(a)} />);
+      // The check's score asks about the merged line; the score from before Shape asks something else.
+      const afterShape: RoleResult = { ...predicted(), questions: [{ bulletId: "r1b2", text: "How many clients after the merge?", options: [], kind: "detail" }], roleQuestions: [] };
+      render(<Harness initial={shapeScores()} start={start} onAction={(a) => actions.push(a)} live />);
       await userEvent.click(screen.getByRole("button", { name: "Start" }));
       await userEvent.click(await screen.findByRole("button", { name: "Merge all and continue" }));
       // No waiting screen: the next step is there before the check answers, and the CV is not changed yet.
@@ -539,8 +542,9 @@ describe("the short path", () => {
       await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
       expect(await screen.findByRole("heading", { name: "Updating your scores…" })).toBeInTheDocument();
       expect(screen.queryByText(/^Budget:/)).toBeNull();
-      finish({ result: predicted(), kept: [], held: [] });
-      expect(await screen.findByText(/^Budget:/)).toBeInTheDocument();
+      finish({ result: afterShape, kept: [], held: [] });
+      // The questions are picked from the scores the check put, not from the ones the tools step saw.
+      expect(await screen.findByText("Budget: How many clients after the merge?")).toBeInTheDocument();
       expect(actions.some((a) => a.type === "applyRoleChanges" && a.roleId === "r1")).toBe(true);
     });
 
