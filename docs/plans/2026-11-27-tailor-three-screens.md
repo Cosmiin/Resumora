@@ -56,40 +56,54 @@ Asked once per run: a second call returns the stored questions.
 
 ## Part B: the site shows three screens
 
+The new screens are built and tested on their own first (B1 to B3), then wired into the flow in one step that also removes the old screens (B4). Until B4 the site keeps the old flow.
+
 ### Task B1: The questions screen
 ```
-files: apps/web/src/tailor/TailorFlow.tsx, apps/web/src/tailor/tailor-api.ts, apps/web/src/i18n/en-tailor.ts, apps/web/src/i18n/ro-tailor.ts, apps/web/src/styles/tailor.css
+files: apps/web/src/tailor/tailor-api.ts, apps/web/src/i18n/en-tailor.ts, apps/web/src/i18n/ro-tailor.ts, apps/web/src/styles/tailor.css
 new_files: apps/web/src/tailor/GapQuestions.tsx, apps/web/src/tailor/gap-questions.test.tsx
 deps: A3
-size: ~150 lines
+size: ~120 lines
 ```
-**Goal.** One screen titled by how many things the job asks that the CV doesn't show. One row per question: its short name, the hint when there is one, the roles as chips with the suggested ones first and marked "your CV hints at this" (never ticked for the person: a tick is their own statement), "No, but I used something similar" and "No". The first 6 rows show; the rest sit under "Show more". One button, "Tailor my CV", always enabled: a row left untouched counts as skipped. No gap at all: the screen is skipped.
+**Goal.** `GapQuestions`: one screen titled by how many things the job asks that the CV doesn't show. One row per question: the question, the CV's own words when a role hints at it, the roles as chips (the hinted ones first and marked "your CV hints at this", never ticked for the person: a tick is their own statement), "No, but I used something similar" and "No" as one-tap answers. A row opens with 3 roles (or all the hinted ones), the rest behind "N more roles"; a ticked role is always in sight. The first 6 rows show, the rest behind "Show N more". One button, "Tailor my CV", enabled unless the answers are being sent. It gives one answer per question: the ticked roles in CV order, a one-tap no, or a skip for a row left untouched. It opens with answers given before. `tailor-api.ts` gains `askGaps`, `writeStep` and `finishRun` for the routes of Part A.
+
+**Acceptance tests** (`gap-questions.test.tsx`). The rows, their chips and the hint, with nothing ticked; what is sent for ticks, a one-tap no and an untouched row; a no clears the ticks and a tick clears the no; "Show N more" and "N more roles"; the stored answers on opening and the button disabled while busy; the title for one gap.
 
 ### Task B2: One wait
 ```
-files: apps/web/src/tailor/TailorFlow.tsx, apps/web/src/tailor/tailor-api.ts, apps/web/src/tailor/Working.tsx, apps/web/src/i18n/en-tailor.ts, apps/web/src/i18n/ro-tailor.ts
+files: none
 new_files: apps/web/src/tailor/run-all.ts, apps/web/src/tailor/run-all.test.ts
-deps: A1, A2
-size: ~110 lines
+deps: A1, A2, B1
+size: ~50 lines
 ```
-**Goal.** After the answers are sent, the site writes every step at once (at most 6 requests at a time), then the layout step, then finishes the run. One screen says what is happening ("Tailoring 5 of 12 parts"). A step that fails is tried once more; if it fails again the run still finishes and the final page names the part that stayed as it was. Leaving and coming back continues from the steps not yet written.
+**Goal.** `stepsOf(run, cv)`: every role, project and volunteering role of the run still in the CV, then its other sections, without the layout step. `runAll(api, run, cv, onProgress, atOnce = 6)`: writes those steps with at most `atOnce` requests in flight, then the layout step (when the run has one), then finishes the run; reports progress after each step. A step that fails is tried once more; one that fails twice is returned in `failed` and the run still finishes. A deleted job or a replaced Base CV (`job_not_found`, `base_cv_changed`) stops it at once and is thrown.
+
+**Acceptance tests** (`run-all.test.ts`). The steps of a run; the limit on requests in flight, the layout step after the others, one finish, the progress counts; the retry and the step that fails twice; the two errors that stop it; a run without a layout step.
 
 ### Task B3: The final page
 ```
-files: apps/web/src/tailor/DoneScreen.tsx, apps/web/src/tailor/TailorFlow.tsx, apps/web/src/tailor/tailored-api.ts, apps/web/src/i18n/en-tailor.ts, apps/web/src/i18n/ro-tailor.ts, apps/web/src/styles/tailor.css, apps/api/src/tailor/accept.ts
+files: apps/api/src/tailor/accept.ts, apps/api/src/tailor/write-step.ts, apps/api/src/tailor/review-item.ts, apps/api/test/tailor-write-step.test.ts, apps/api/test/tailor-review-item.test.ts, apps/web/src/tailor/DoneScreen.tsx, apps/web/src/tailor/done-screen.test.tsx, apps/web/src/i18n/en-tailor.ts, apps/web/src/i18n/ro-tailor.ts, apps/web/src/styles/tailor.css
 new_files: apps/web/src/tailor/ChangesList.tsx, apps/web/src/tailor/changes-list.test.tsx
-deps: B2
-size: ~180 lines
+deps: A1
+size: ~220 lines
 ```
-**Goal.** The result screen also shows: every changed line with its wording before and after and an "Undo" (the Base wording comes back; "Redo" puts the change back); added and renamed skills, each with "Remove"; the section order with "Keep mine"; the headline as a choice the person makes ("Use this headline" / "Keep mine"), not applied until chosen; one line naming what was left unchanged; the template choice and the download buttons. A headline that would repeat one of the CV's other titles drops that title (27 Nov: "Business Analyst and Solution Architect · Solution Architect").
+**Goal.**
+- API: the layout step written with `steps/write` does not apply its headline: the proposal is stored in the review state as not kept, for the person to choose. `PATCH /v1/tailored/:id/review` learns two keys of the `layout` section: `headline` (keep = the proposed headline becomes the first title; remove = the Base titles come back) and `layout` (remove = the Base section order comes back; keep = the proposed order again). A headline that holds one of the CV's other titles drops that title, wherever a headline is applied (27 Nov: "Business Analyst and Solution Architect · Solution Architect").
+- Web, `ChangesList`: from the tailored CV and its review state, every kept change with its wording before (from the Base snapshot) and after, grouped by role or section, each with "Undo" (the Base wording comes back; the row then reads "Kept your wording"); added skills with "Remove"; the section order, when it changed, with "Keep mine"; the proposed headline with "Use this headline" and "Keep mine"; one line naming the parts left unchanged. An undo that fails says so and leaves the row as it was.
+- Web, `DoneScreen`: shows the list under the score cards, and the download buttons (PDF and Word, in the CV's saved template, with a link to change the template) instead of the link to the download page. The "N AI guesses not checked" notice stays for older tailored CVs.
 
-### Task B4: The old screens go
+**Acceptance tests.** API: a layout write leaves the titles as they were and stores the headline as not kept; keep and remove for `headline` and for `layout`; the doubled title is dropped. Web: the list from a review state (changed line, new skill, order, headline, unchanged parts); Undo calls the review route and marks the row; a failed undo; the headline's two choices; the download buttons call the export with the saved template.
+
+### Task B4: The flow uses the new screens, and the old ones go
 ```
-files: apps/web/src/tailor/TailorFlow.tsx, apps/web/src/tailor/Room.tsx and the review screens it no longer opens, their tests, the i18n files
+files: apps/web/src/tailor/TailorFlow.tsx, apps/web/src/tailor/flow-phase.ts, apps/web/src/tailor/Working.tsx, apps/web/src/tailor/Room.tsx, the review and question screens the flow no longer opens with their tests, apps/web/src/i18n/en-tailor.ts, apps/web/src/i18n/ro-tailor.ts, apps/web/src/styles/tailor.css
+new_files: apps/web/src/tailor/three-screens.test.tsx
 deps: B1 to B3
-size: removal
+size: ~150 lines added, far more removed
 ```
-**Goal.** The per-role questions, the per-step waits, the per-section review screens and the left-hand map are no longer reachable from tailoring; code only they used is deleted. "Change my answers" opens the questions screen again and re-runs only the roles whose answers changed.
+**Goal.** `/jobs/:id/tailor`: starts (or continues) the run; asks the gap questions once and shows `GapQuestions` (skipped when there is no gap, or when every question already has an answer); sends the answers; one wait with its progress ("Tailoring 5 of 12 parts") while `runAll` works; then the final page, which names any part that could not be tailored. A run already done opens on the final page. A run left during the wait runs the wait again when opened (writing a step twice gives the same CV). The bar keeps the job's name, the match, the language choice (until the answers are sent) and Adjust; the left-hand map, the per-role questions, the per-step waits and the per-section review screens are no longer reachable, and code only they used is deleted with its tests. "Change my answers" on the final page opens the questions screen with the answers given; sending them runs the wait again.
+
+**Acceptance tests** (`three-screens.test.tsx`). Start → questions → answers sent → every step written → finish → the final page; no gap: straight to the wait; a done run: the final page with no request to write; a failed part named on the final page; a deleted job; changing the answers from the final page.
 
 ## Order and checks
-A1 → A2 → A3 (PR, live, unused by the site) → B1 → B2 → B3 → B4 (PR, live). After Part B the owner tailors the same job once more.
+A1 → A2 → A3 (PR 99, live, unused by the site) → B1 → B2 → B3 → B4 (one PR, live). After Part B the owner tailors the same job once more.

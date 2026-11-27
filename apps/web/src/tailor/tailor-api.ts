@@ -109,3 +109,21 @@ export function changeSteering(id: string, steering: Steering): Promise<{ run: T
 export async function getSteering(id: string): Promise<Steering> {
   return (await apiFetch(`${run(id)}/steering`, { schema: z.object({ steering: SteeringSchema }) })).steering;
 }
+
+/** Every question of the tailoring in one call: one per gap, with the roles whose lines hint at it. Asked once per run. */
+export async function askGaps(id: string): Promise<TailorQuestion[]> {
+  const body = await apiFetch(`${run(id)}/gap-questions`, { method: "POST", json: {}, schema: z.object({ questions: z.array(TailorQuestionSchema) }) });
+  return body.questions;
+}
+
+/** Makes one step and writes it straight into the tailored CV: any step of the run, several at the same time. */
+export function writeStep(id: string, section: TailorSection, roleId?: string): Promise<{ changed: number; removed: number }> {
+  return apiFetch(`${run(id)}/steps/write`, {
+    method: "POST", json: { section, ...roleBody(roleId) }, schema: z.object({ changed: z.number().int().min(0), removed: z.number().int().min(0) }),
+  });
+}
+
+/** Ends a run whose steps were written with `writeStep`: the tailored CV is scored once. */
+export function finishRun(id: string): Promise<{ run: TailorRun; score: MatchScore }> {
+  return apiFetch(`${run(id)}/finish`, { method: "POST", json: {}, schema: z.object({ run: TailorRunSchema, score: MatchScoreSchema }) });
+}

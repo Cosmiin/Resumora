@@ -291,3 +291,10 @@
   .tailor-room-main { padding: var(--space-4); }
 }
 @media (prefers-reduced-motion: reduce) { .tailor-stopdone { animation: none; } }
+
+/* The one questions screen: a row per gap, its roles as chips. */
+.tailor-gaps { max-width: 760px; margin: var(--space-6) auto 0; }
+.tailor-gap { display: grid; gap: var(--space-3); }
+.tailor-gap .answer-opt { font-size: var(--text-small, 13px); padding: 5px 12px; }
+.tailor-gap-hinted { opacity: 0.8; font-style: italic; }
+.tailor-gaps-go { display: flex; justify-content: flex-end; margin-top: var(--space-4); }

@@ -47,3 +47,12 @@ Fixed after the first run (commit after 40ecad7, reviewed on its own, no finding
 Still true: the score moves between runs of the same CV and job (the weak-support pair scored 59, then 0), so score lifts say little.
 
 cost: reviews 5 agents (three tasks on Sonnet, the whole branch and the trial fixes on Opus) · guard denials 0 · real-AI runs: 3 probes, well under $1.
+
+## Tasks B1 and B2: the questions screen, and one wait — done
+session: Shorten the tailoring flow · builder: claude
+commit: see the log (base 544d8bd) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0
+open: neither is wired into the flow yet (Task B4); the site keeps the old flow until then.
+
+- The two tasks were built and reviewed together. The first review asked for fixes: an error nothing can fix (job deleted, Base CV replaced) did not stop the other workers from starting further steps, and the screen used `t` where new screens use `useT`. Both fixed; the second review found nothing.
+- Part B of the plan was rewritten to the order it is built in: the screens first, each with its tests, then one task that wires them in and removes the old ones.
+- Rulings: suggested roles are shown first and marked, never ticked for the person (a tick is their statement and is what gets written). "No" replaces "No, and nothing similar" on this screen. A run left during the wait runs the wait again when opened, instead of continuing from the steps not yet written.
