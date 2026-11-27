@@ -82,6 +82,8 @@ export function TailorFlow() {
       track(asked);
       const answered = new Set((current.answers ?? []).map((answer) => answer.questionId));
       if (questions.every((question) => answered.has(question.id))) return void wait(asked);
+      // The questions are answered by ticking roles, so they wait for the CV that holds them.
+      await baseCv();
       setPhase({ kind: "questions", questions, busy: false });
     } catch (cause) { fail(cause, () => void ask(current)); }
   }
@@ -126,6 +128,14 @@ export function TailorFlow() {
     } catch (cause) { fail(cause, () => void wait(current)); }
   }
 
+  /** "Change my answers" on the final page: the questions with the answers given, once the roles to tick are there. */
+  async function reopen(questions: TailorQuestion[], resume: Phase) {
+    setPhase({ kind: "loading" });
+    try {
+      await baseCv();
+      setPhase({ kind: "questions", questions, busy: false, resume });
+    } catch (cause) { fail(cause, () => void reopen(questions, resume)); }
+  }
   /** The Adjust screen of a started run, from its stored steering (never from defaults). */
   async function openSteer(resume: Phase) {
     setPhase({ kind: "loading" });
@@ -213,7 +223,7 @@ export function TailorFlow() {
   } else if (phase.kind === "working") body = <Working done={phase.done} total={phase.total} />;
   else if (phase.kind === "done") {
     body = <DoneScreen jobId={jobId} docId={run?.tailoredCvId ?? null} base={baseScore} final={score ?? baseScore} job={job} failed={phase.failed}
-      onAnswers={gaps.length > 0 ? () => setPhase({ kind: "questions", questions: gaps, busy: false, resume: phase }) : undefined} />;
+      onAnswers={gaps.length > 0 ? () => void reopen(gaps, phase) : undefined} />;
   } else if (phase.kind === "deleted") {
     body = <section className="ui-stack tailor-narrow" role="alert"><h1 className="ui-title">{t("tailor.error.deleted")}</h1>
       <p><Link className="ui-btn" to="/jobs">{t("tailor.error.toJobs")}</Link></p></section>;

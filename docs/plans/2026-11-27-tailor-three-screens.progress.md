@@ -56,3 +56,28 @@ open: neither is wired into the flow yet (Task B4); the site keeps the old flow 
 - The two tasks were built and reviewed together. The first review asked for fixes: an error nothing can fix (job deleted, Base CV replaced) did not stop the other workers from starting further steps, and the screen used `t` where new screens use `useT`. Both fixed; the second review found nothing.
 - Part B of the plan was rewritten to the order it is built in: the screens first, each with its tests, then one task that wires them in and removes the old ones.
 - Rulings: suggested roles are shown first and marked, never ticked for the person (a tick is their statement and is what gets written). "No" replaces "No, and nothing similar" on this screen. A run left during the wait runs the wait again when opened, instead of continuing from the steps not yet written.
+
+## Task B3: The final page — done
+session: Shorten the tailoring flow · builder: claude
+commit: 45f8844 (base 9cdb696) · reviews: 1 (agent) · fix rounds: 0 · guard denials: 0
+open: none
+
+- The layout step written with `steps/write` proposes the headline and leaves it for the person; a headline that holds the CV's other title drops that title wherever a headline is applied. The review route learned the headline, the section order, and the order and hidden items of the lighter sections.
+- `ChangesList` shows every change with the person's wording and the new one, each with its way back; `DoneScreen` shows it with the PDF and Word downloads in the saved template.
+- Rulings are in the plan under the task.
+
+## Task B4: The flow uses the new screens, and the old ones go — done
+session: Shorten the tailoring flow · builder: claude
+commit: 4e610c2 and the fix after it (base 45f8844) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0
+open: a gap ticked for a role with no line that can carry it ends as an added skill only (the new line for a confirmed gap is the next plan)
+
+- `/jobs/:id/tailor` is three screens: every gap on one screen, one wait, the final page. The role-by-role room, its question cards and its reviews are gone with their tests, 134 copy keys per language and their style rules (about 3,400 lines removed).
+- The first review found that an all-roles answer sent again with other roles ticked left the new role without its note; fixed in `saveAnswers` with a test. Before that, building "Change my answers" showed that a role which lost its tick kept the note of the earlier yes, so the writer still read it; a write step now leaves such notes out for its run.
+- Run on the local stack with real AI (the owner's test job, 13 parts): questions in about 5 seconds, the wait about 15 seconds, one score about 6 seconds. Fixed from that run: the final page was not centred, the downloads sat under the list, the wait said nothing while the match was worked out.
+
+## Part B: whole branch — done
+reviews: 1 whole-branch (Opus) and 2 of its fix (Opus) · fix rounds: 2
+- The whole-branch review passed with one low finding: the questions could be shown without the roles to tick when the Base CV failed to load. Fixed for the first visit; the review of the fix found the same hole behind "Change my answers"; fixed too, second review of the fix passed.
+- Merged with main before the review (the enrichment work of another thread; no file in common).
+
+cost: reviews 6 agents (3 on Sonnet, 3 on Opus) · guard denials 0 · real-AI runs: 2 tailorings of one job on the local stack, well under $1.

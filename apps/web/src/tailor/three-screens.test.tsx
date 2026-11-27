@@ -194,6 +194,18 @@ describe("tailoring in three screens", () => {
     expect(finishRun).toHaveBeenCalledTimes(2);
   });
 
+  it("never shows the questions without the roles to tick: a CV that didn't load is asked for again", async () => {
+    const user = userEvent.setup();
+    const loaded = { content: cv, version: 1, updatedAt: at } as Awaited<ReturnType<typeof getCv>>;
+    // The load when the page opens fails, and so does the one the questions wait for; the retry gets the CV.
+    vi.mocked(getCv).mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(new Error("offline")).mockResolvedValue(loaded);
+    renderFlow();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong. Try again");
+    expect(screen.queryByRole("button", { name: "Tailor my CV" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await within(await screen.findByRole("group", { name: "Did you use KissFlow?" })).findByRole("button", { name: /Business Analyst/ })).toBeInTheDocument();
+  });
+
   it("Change my answers opens the questions with the answers given, and sending them tailors again", async () => {
     const user = userEvent.setup();
     localStorage.setItem("resumora.tailorRun.one", "run1");
@@ -216,6 +228,22 @@ describe("tailoring in three screens", () => {
     expect(sendAnswers).toHaveBeenCalledWith("run2", [used, { questionId: "q2", value: "Yes", via: "option", use: "used", roleIds: ["r2"] }]);
     expect(steps().every((step) => step.startsWith("run2:"))).toBe(true);
     expect(finishRun).toHaveBeenCalledWith("run2");
+  });
+
+  it("Change my answers waits for the roles too: a CV that didn't load is asked for again", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    vi.mocked(getRun).mockResolvedValue(done({ questions: [kissflow, zendesk], answers: [used, skipped] }));
+    const loaded = { content: cv, version: 1, updatedAt: at } as Awaited<ReturnType<typeof getCv>>;
+    // The load when the page opens fails (a finished run needs no CV to show its result); the next one works.
+    vi.mocked(getCv).mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(new Error("offline")).mockResolvedValue(loaded);
+    renderFlow();
+    await user.click(await screen.findByRole("button", { name: "Change my answers" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong. Try again");
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    // The role ticked before is there, and still ticked.
+    const first = within(await screen.findByRole("group", { name: "Did you use KissFlow?" }));
+    expect(first.getByRole("button", { name: /Business Analyst/ })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("has no Change my answers when nothing was asked", async () => {
