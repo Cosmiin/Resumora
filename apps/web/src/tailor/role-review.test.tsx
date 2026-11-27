@@ -1,21 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter, RouterProvider } from "react-router";
-import { emptyCv, TAILOR_SECTIONS, type MatchScore, type Proposal, type TailorRun } from "@resumora/shared";
+import type { Proposal } from "@resumora/shared";
 import { RoleReview } from "./RoleReview.tsx";
-
-vi.mock("./tailor-api.ts", () => ({
-  askAcross: vi.fn(async () => []), startTailoring: vi.fn(), getRun: vi.fn(), askQuestions: vi.fn(), sendAnswers: vi.fn(), runSection: vi.fn(), acceptSection: vi.fn(),
-  getScores: vi.fn(), getToneExamples: vi.fn(), redoRole: vi.fn(), acceptRole: vi.fn(), getSteering: vi.fn(), changeSteering: vi.fn(),
-}));
-vi.mock("../jobs/jobs-api.ts", () => ({ getJob: () => Promise.reject(new Error("offline")), scoreJob: () => Promise.resolve({ base: null, tailored: null }) }));
-vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
-vi.mock("../cv/cv-api.ts", () => ({ getCv: vi.fn() }));
-import { getCv } from "../cv/cv-api.ts";
-import { useVoice } from "../cv/enrich/useVoice.ts";
-import { acceptRole, acceptSection, askQuestions, getRun, getScores, redoRole, runSection, sendAnswers } from "./tailor-api.ts";
-import { TailorFlow } from "./TailorFlow.tsx";
 
 const role = {
   id: "r1", company: "Emedi", title: "Business Analyst", location: "", startDate: "2021-03", endDate: "", current: true,
@@ -124,56 +111,5 @@ describe("RoleReview: a role's suggestions, one at a time", () => {
     expect(screen.queryByRole("button", { name: "Skip this role" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(onAccept).toHaveBeenCalledWith({ decisions: [], inferred: [], flags: [] });
-  });
-});
-
-const at = "2026-11-09T10:00:00Z";
-const run = (over: Partial<TailorRun> = {}): TailorRun => ({
-  id: "run1", userId: "u1", jobId: "one", tailoredCvId: "cv1", kind: "tailor", sections: [...TAILOR_SECTIONS],
-  status: "waiting_user", currentSection: "experience", errorCode: null, roleOrder: ["r1", "r2"], currentRoleId: "r1", createdAt: at, updatedAt: at,
-  questions: [{ id: "q1", section: "experience", roleId: "r1", text: "How often?", kind: "options", options: ["Weekly"], reason: "Gap" }],
-  answers: [{ questionId: "q1", value: "Weekly", via: "option" }], proposals: null, ...over,
-});
-const score = (total: number): MatchScore => ({ policy: "match/1", total, band: "fair", capped: false, labels: [],
-  parts: { requirements: null, keywords: null, seniority: null, langEdu: null } });
-
-describe("the Experience review in the flow", () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    localStorage.clear();
-    localStorage.setItem("resumora.tailorRun.one", "run1");
-    vi.mocked(useVoice).mockReturnValue({ state: "unavailable", count: null, connecting: false, partial: "", partialWords: [], seconds: 0,
-      interrupted: false, start: vi.fn(), stop: vi.fn(), onFinal: vi.fn() });
-    vi.mocked(getScores).mockResolvedValue({ base: score(62), tailored: null });
-    vi.mocked(getCv).mockResolvedValue({ content: { ...emptyCv("en"), experience: [role] }, version: 1, updatedAt: at });
-    vi.mocked(getRun).mockResolvedValue(run());
-    vi.mocked(askQuestions).mockResolvedValue([]);
-    vi.mocked(sendAnswers).mockResolvedValue(undefined);
-    vi.mocked(runSection).mockResolvedValue({ proposals: [proposals[2]!], questions: [] });
-  });
-
-  it("shows the current role's review; Change my answers updates this role and the accept still moves the run on", async () => {
-    const user = userEvent.setup();
-    vi.mocked(redoRole).mockResolvedValue({ proposals: [{ ...proposals[2]!, text: "Checked data daily with sales leads" }], removed: 0 });
-    vi.mocked(acceptSection).mockResolvedValue({ run: run({ status: "done", currentSection: null }), score: score(70) });
-    const router = createMemoryRouter([{ path: "/jobs/:id/tailor", element: <TailorFlow /> }, { path: "/jobs/:id/cv", element: <p>CV page</p> }],
-      { initialEntries: ["/jobs/one/tailor"] });
-    render(<RouterProvider router={router} />);
-
-    await user.click(await screen.findByRole("button", { name: "Change my answers" }));
-    const box = await screen.findByRole("textbox");
-    expect(box).toHaveValue("Weekly");
-    await user.clear(box);
-    await user.type(box, "Daily");
-    await user.click(screen.getByRole("button", { name: "Update this role" }));
-    expect(redoRole).toHaveBeenCalledWith("run1", "r1", [{ questionId: "q1", value: "Daily", via: "typed" }]);
-
-    const card = await screen.findByRole("region", { name: "Business Analyst, Emedi" });
-    expect(card.querySelector(".ui-diff-new")).toHaveTextContent("Checked data daily with sales leads");
-    expect(within(card).getByText("Role 1 of 1 · Mar 2021 – Present")).toBeInTheDocument();
-    await user.click(within(card).getByRole("button", { name: "Yes, it's true. Use it" }));
-    await user.click(screen.getByRole("button", { name: "Save and continue" }));
-    expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [{ itemId: "b2", keep: true }], inferred: [], flags: [], roleId: "r1" });
-    expect(acceptRole).not.toHaveBeenCalled();
   });
 });

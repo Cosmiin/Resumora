@@ -24,8 +24,6 @@ import "../styles/tailor.css";
 
 export { remember, remembered } from "./flow-phase.ts";
 
-/** A guess: an inferred line the person must confirm (flagged lines never reach a review). */
-const isGuess = (p: Proposal) => p.inferred && p.flags.length === 0;
 const plain = (text: string) => text.replace(/\s+/g, " ").trim().toLowerCase();
 /** The same words, whatever the case or spacing. */
 const sameWords = (a: string, b: string) => plain(a) === plain(b);
@@ -132,9 +130,10 @@ export function TailorFlow() {
     try {
       const { proposals, removed } = await api.runSection(runRef.current!.id, at, roleArg(at));
       if (proposals.length === 0 && FINAL_SECTIONS.includes(at)) return void pass(at);
-      // A role's plain rewordings are used without asking; only a guess (a fact to confirm) opens its review.
+      // A role is saved without a screen: missing facts are asked by the questions, never by showing the line. A guess
+      // nobody confirmed stays marked on the tailored CV, for its guided review.
       const none = { decisions: [], inferred: [], flags: [] };
-      if (isRoleSection(at) && !proposals.some(isGuess)) return void accept(at, none, () => void work(at));
+      if (isRoleSection(at)) return void accept(at, none, () => void work(at));
       // Changes that only alter case or spacing (webhooks → Webhooks) are used without a screen; with nothing else, no screen at all.
       const shown = proposals.filter((p) => !cosmetic(p));
       if (proposals.length > 0 && shown.length === 0) return void accept(at, none, () => void work(at), true);
@@ -199,12 +198,9 @@ export function TailorFlow() {
       const at = runRef.current?.currentSection;
       const current = isRoleSection(at) && runRef.current?.currentRoleId === roleId;
       const review: Extract<Phase, { kind: "redo" }> = { kind: "redo", roleId, proposals, removed, busy: false, resume };
-      // Plain rewordings are used without asking, as on the first pass.
-      if (!proposals.some(isGuess)) {
-        const none = { decisions: [], inferred: [], flags: [] };
-        return void (current && at ? accept(at, none, () => setPhase(resume)) : acceptRedo(roleId, none, review));
-      }
-      setPhase(current ? { kind: "review", proposals, removed, busy: false } : review);
+      // Saved without a screen, as on the first pass.
+      const none = { decisions: [], inferred: [], flags: [] };
+      return void (current && at ? accept(at, none, () => setPhase(resume)) : acceptRedo(roleId, none, review));
     } catch (cause) { fail(cause, "experience", () => setPhase({ kind: "role", roleId, busy: false, resume })); }
   }
   async function acceptRedo(roleId: string, body: api.AcceptBody, review: Extract<Phase, { kind: "redo" }>) {
