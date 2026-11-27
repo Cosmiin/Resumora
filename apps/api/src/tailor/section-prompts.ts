@@ -26,7 +26,7 @@ Use only this item's own bullets, notes, facts and answers.
 Keep each line in the past tense when the role has ended or the line is already in the past; every verb in the line uses that tense.
 Never remove a role, a bullet's facts, or change company, title or dates.
 Editable fields: each bullet is its own item, itemId = the bullet's id, field "text"; a role's own wording is itemId = the role's id, field "description". Never return a role's bullets as one field.
-A new line: "confirmed" (when the message has it) lists gaps the person said yes to for this role, each with the question they answered. Each confirmed gap should end up named in the role once. Rewording comes first, but only where it fits: reword a bullet when that bullet is already about the same activity (a bullet about operating procedures can say they were documented and maintained). Never squeeze a confirmed gap into a bullet about other work as one more item in its list ("…wrote user stories, used prompt engineering, ran acceptance tests…" is forcing it). When no bullet is about that activity, add a line of its own instead: itemId "new-bullet", field "text", inferred false. That line is one short sentence (at most 20 words) that names the gap in the question's own words, and uses only words the question and this item (its description, bullets, notes and facts) already contain: no purpose, result, tool, scale or number of your own. At most one new line per confirmed gap, and none for a gap that is not under "confirmed".`,
+"confirmed" (when the message has it) lists gaps the person said yes to for this role, each with the question they answered. Reword a bullet that is already about the same activity so that it names the gap (a bullet about operating procedures can say they were documented and maintained). Never squeeze a confirmed gap into a bullet about other work as one more item in its list ("…wrote user stories, used prompt engineering, ran acceptance tests…" is forcing it). When no bullet is about that activity, change nothing for that gap. Never add a bullet: return only existing item ids.`,
   projects: `The item under "edit" is a project or a volunteering role (its "kind" says which).
 ${GAP_RULE}
 A volunteering role: tailor it like a role.
@@ -90,8 +90,6 @@ export function sectionUserMessage(input: {
   gaps?: Gap[];
   /** A role of Experience: the gaps the person ticked this role for, each with the question they said yes to. */
   confirmed?: { gap: string; question: string }[];
-  /** The ones among them that nothing in the role names after the first answer: asked for once more, alone. */
-  missing?: { gap: string; question: string }[];
 }): string {
   const { title, summary, requirements, responsibilities } = input.job;
   return JSON.stringify({
@@ -100,7 +98,6 @@ export function sectionUserMessage(input: {
     job: input.gaps ? { title, summary, gaps: input.gaps } : { title, summary, requirements, responsibilities },
     answers: input.answers,
     ...(input.confirmed ? { confirmed: input.confirmed } : {}),
-    ...(input.missing?.length ? { stillMissing: { note: "The person said yes to these for this role, and nothing in the role names them yet. Return only changes for them: for each, reword the bullet that is about the same activity, or add a new line (itemId \"new-bullet\").", gaps: input.missing } } : {}),
     ...(input.retry.length > 0 ? { fix: { note: "Rewrite only these items so the flags no longer apply.", proposals: input.retry } } : {}),
   });
 }

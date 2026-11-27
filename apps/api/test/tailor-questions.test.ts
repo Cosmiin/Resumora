@@ -570,8 +570,8 @@ describe("questions for every role at once", () => {
     const notes = await jobNotes();
     expect(notes).toEqual(expect.arrayContaining([
       expect.objectContaining({ roleId: older.id, answer: "Used Nomad for the kind of work a tool the job names does (not that tool itself)" }),
-      expect.objectContaining({ roleId: newest.id, answer: "Used Team lead" }),
-      expect.objectContaining({ roleId: older.id, answer: "Used Team lead" }),
+      expect.objectContaining({ roleId: newest.id, answer: "Yes" }),
+      expect.objectContaining({ roleId: older.id, answer: "Yes" }),
     ]));
     expect(notes).toHaveLength(3);
   });
@@ -676,7 +676,7 @@ describe("gap questions: every gap asked once, with the roles it may fit", () =>
       { questionId: lead!.id, value: "Yes", via: "option", use: "used", roleIds: [newest.id] },
     ] });
     expect(res.status).toBe(200);
-    expect(await jobNotes()).toEqual([expect.objectContaining({ roleId: newest.id, answer: "Used Team lead" })]);
+    expect(await jobNotes()).toEqual([expect.objectContaining({ roleId: newest.id, answer: "Yes" })]);
 
     // The same yes with another role ticked: the new role gets its note, the role noted before gets no second one.
     const again = await call(`/v1/tailor-runs/${runId}/answers`, { answers: [

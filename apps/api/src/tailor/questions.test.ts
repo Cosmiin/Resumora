@@ -39,10 +39,10 @@ describe("tailoring questions in Projects & volunteering", () => {
 describe("an all-roles answer as a note", () => {
   const question = { id: "q", section: "experience" as const, roleId: null, text: "Did you use KissFlow?", kind: "skill" as const,
     options: [], reason: "Gap", skill: "KissFlow", scope: "all" as const };
-  it("names the tool used, the similar tool without the asked one's name, and nothing for neither", async () => {
+  it("says yes to the question for what was used, names a similar tool without the asked one's name, and nothing for neither", async () => {
     const { acrossNote } = await import("./section-pass.ts");
     const { unknownTools } = await import("./checks.ts");
-    expect(acrossNote(question, { questionId: "q", value: "Yes", via: "option", use: "used", roleIds: ["r1"] })).toBe("Used KissFlow");
+    expect(acrossNote(question, { questionId: "q", value: "Yes", via: "option", use: "used", roleIds: ["r1"] })).toBe("Yes");
     const similar = acrossNote(question, { questionId: "q", value: "Make.com", via: "typed", use: "similar", roleIds: ["r1"] })!;
     expect(similar).toContain("Make.com");
     expect(unknownTools("Automated approvals in KissFlow", [similar])).toEqual(["KissFlow"]);

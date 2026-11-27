@@ -28,7 +28,7 @@ const ROLES = 3;
 
 /**
  * Every question of a tailoring on one screen: one row per gap, answered by ticking the roles where it is true, or
- * with one tap for "something similar" or "no". A role the CV hints at comes first and says so, but nothing is ticked
+ * with one tap for "no". A role the CV hints at comes first and says so, but nothing is ticked
  * for the person: a tick is their own statement, and it is what gets written.
  */
 export function GapQuestions({ questions, roles, locale, answers = [], busy, onSubmit, onCancel }: Props) {
@@ -36,7 +36,9 @@ export function GapQuestions({ questions, roles, locale, answers = [], busy, onS
   const given = new Map(answers.map((answer) => [answer.questionId, answer]));
   const [picks, setPicks] = useState<Record<string, Pick>>(() => Object.fromEntries(questions.map((question) => {
     const answer = given.get(question.id);
-    const use = answer?.via === "skip" ? null : answer?.use ?? null;
+    // An answer from when the screen had "No, but I used something similar" is a no: that answer wrote nothing either.
+    const stored = answer?.via === "skip" ? null : answer?.use ?? null;
+    const use = stored === "similar" ? "none" : stored;
     return [question.id, { use, roleIds: use === "used" ? answer?.roleIds ?? [] : [] }];
   })));
   const [allRows, setAllRows] = useState(false);
@@ -49,7 +51,7 @@ export function GapQuestions({ questions, roles, locale, answers = [], busy, onS
     const roleIds = now.use === "used" && now.roleIds.includes(roleId) ? now.roleIds.filter((x) => x !== roleId) : [...(now.use === "used" ? now.roleIds : []), roleId];
     set(id, { use: roleIds.length > 0 ? "used" : null, roleIds });
   };
-  const oneTap = (id: string, use: "similar" | "none") => set(id, { use: pick(id).use === use ? null : use, roleIds: [] });
+  const sayNo = (id: string) => set(id, { use: pick(id).use === "none" ? null : "none", roleIds: [] });
   const submit = () => onSubmit(questions.map((question): Answer => {
     const { use, roleIds } = pick(question.id);
     if (use === "used") return { questionId: question.id, value: "Yes", via: "option", use, roleIds: roles.map((r) => r.id).filter((id) => roleIds.includes(id)) };
@@ -83,8 +85,7 @@ export function GapQuestions({ questions, roles, locale, answers = [], busy, onS
             {t(more === 1 ? "tailor.gaps.moreRolesOne" : "tailor.gaps.moreRoles", { n: more })}</button>}
         </div>
         <div className="answer-opts">
-          <button type="button" className="answer-opt" aria-pressed={use === "similar"} onClick={() => oneTap(question.id, "similar")}>{t("tailor.across.similar")}</button>
-          <button type="button" className="answer-opt" aria-pressed={use === "none"} onClick={() => oneTap(question.id, "none")}>{t("tailor.gaps.none")}</button>
+          <button type="button" className="answer-opt" aria-pressed={use === "none"} onClick={() => sayNo(question.id)}>{t("tailor.gaps.none")}</button>
         </div>
       </div>;
     })}
