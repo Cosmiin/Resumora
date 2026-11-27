@@ -129,6 +129,17 @@ describe("the start of a role", () => {
     expect(sent.changes).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "bullet", bulletId: "b1", text: NEW_B1 })]));
   });
 
+  it("does not ask what the company does for a self-employed or freelance role", async () => {
+    const own: Experience = { ...role, company: "Freelancing" };
+    render(<Harness initialRole={own} roleResult={{ ...result, fingerprint: fingerprint(own, "en"), roleQuestions: [
+      { id: "rq1", text: "What does Freelancing do?", options: [], kind: "role", topic: "company" },
+      result.roleQuestions[1]!,
+    ] }} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(screen.getByRole("heading", { name: "Did anyone report to you in this role?" })).toBeInTheDocument();
+    expect(screen.queryByText("What does Freelancing do?")).toBeNull();
+  });
+
   it("the placing step gets this run's answers only, not the ones the role already held", async () => {
     const told: Experience = { ...role, notes: [
       { id: "old1", question: "What does Nordlane Logistics do?", answer: "Parcel delivery for online shops.", via: ["pick"], askedAt: "2026-11-20T00:00:00Z", topic: "company" },

@@ -50,6 +50,44 @@ describe("CompaniesStep", () => {
     expect(saved.some((s) => s.roleId === "d")).toBe(false);
   });
 
+  it("asks nothing about a self-employed or freelance role, and saves nothing for it", async () => {
+    const own: CvContent = { ...cv, experience: [...cv.experience, role("s", { company: "Self-Employed", location: "Remote" }), role("f", { company: "Freelancing" })] };
+    const onDone = vi.fn();
+    render(<CompaniesStep cv={own} onDone={onDone} />);
+    const rows = await screen.findAllByRole("group");
+    expect(rows.map((r) => within(r).getByRole("heading").textContent)).toEqual(["Carbon Global · Remote", "Elias Metal"]);
+    await userEvent.click(next());
+    expect((onDone.mock.calls[0]![0] as Saved).some((s) => s.roleId === "s" || s.roleId === "f")).toBe(false);
+  });
+
+  it("asks nothing about a name the AI says is the person working for themselves", async () => {
+    const own: CvContent = { ...cv, experience: [...cv.experience, role("i", { company: "Independent Shopify Projects" })] };
+    api.suggestCompanies.mockResolvedValue({ companies: [
+      { key: "carbon global", proposal: null },
+      { key: "robert half", proposal: "Staffing and recruitment firm." },
+      { key: "elias metal", proposal: null },
+      { key: "independent shopify projects", proposal: null, selfEmployed: true },
+    ] });
+    const onDone = vi.fn();
+    render(<CompaniesStep cv={own} onDone={onDone} />);
+    const rows = await screen.findAllByRole("group");
+    expect(rows.map((r) => within(r).getByRole("heading").textContent)).toEqual(["Carbon Global · Remote", "Elias Metal"]);
+    await userEvent.click(next());
+    expect((onDone.mock.calls[0]![0] as Saved).some((s) => s.roleId === "i")).toBe(false);
+  });
+
+  it("moves on by itself when the only name left to ask about is the person's own work", async () => {
+    const own: CvContent = { ...emptyCv("en"), experience: [role("c", { company: "Robert Half" }), role("i", { company: "Independent Shopify Projects" }), role("s", { company: "Self-employed" })] };
+    api.suggestCompanies.mockResolvedValue({ companies: [
+      { key: "robert half", proposal: "Staffing and recruitment firm." },
+      { key: "independent shopify projects", proposal: null, selfEmployed: true },
+    ] });
+    const onDone = vi.fn();
+    render(<CompaniesStep cv={own} onDone={onDone} />);
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    expect((onDone.mock.calls[0]![0] as Saved).map((s) => s.roleId)).toEqual(["c"]);
+  });
+
   it("fills in a company the AI knows without asking, says so, and saves it as picked", async () => {
     const onDone = vi.fn();
     render(<CompaniesStep cv={cv} onDone={onDone} />);

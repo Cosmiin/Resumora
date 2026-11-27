@@ -58,6 +58,40 @@ describe("POST /v1/enrich/companies", () => {
     expect(body.companies).toEqual([{ key: "robert half", proposal: null }]);
   });
 
+  it("does not send a self-employed or freelance name to the AI, and answers it as the person's own work", async () => {
+    await save({ experience: [first, roleWith(["Built sites for clients."], { company: "Self-Employed", location: "Remote" }), roleWith(["Wrote copy."], { company: "Freelancing" })] });
+    answer = () => ({ companies: [{ key: "carbon global", proposal: null, selfEmployed: false }] });
+    const body = CompaniesAnswerSchema.parse(await (await post("companies")).json());
+    expect(body.companies).toEqual([
+      { key: "self-employed", proposal: null, selfEmployed: true },
+      { key: "freelancing", proposal: null, selfEmployed: true },
+      { key: "carbon global", proposal: null },
+    ]);
+    expect(sent()).not.toContain("Self-Employed");
+    expect(sent()).not.toContain("Freelancing");
+  });
+
+  it("passes on a name the AI says is the person working for themselves, without a description", async () => {
+    await save({ experience: [first, roleWith(["Ran small stores."], { company: "Independent Shopify Projects" })] });
+    answer = () => ({ companies: [
+      { key: "carbon global", proposal: "Carbon accounting software.", selfEmployed: false },
+      { key: "independent shopify projects", proposal: "Shopify stores for small brands.", selfEmployed: true },
+    ] });
+    const body = CompaniesAnswerSchema.parse(await (await post("companies")).json());
+    expect(body.companies).toEqual([
+      { key: "carbon global", proposal: "Carbon accounting software." },
+      { key: "independent shopify projects", proposal: null, selfEmployed: true },
+    ]);
+    expect(sent()).toContain("working for themselves");
+  });
+
+  it("makes no AI call when every name is the person's own work", async () => {
+    await save({ experience: [roleWith(["Built sites."], { company: "Freelance" })] });
+    const body = CompaniesAnswerSchema.parse(await (await post("companies")).json());
+    expect(body.companies).toEqual([{ key: "freelance", proposal: null, selfEmployed: true }]);
+    expect(model.requests).toHaveLength(0);
+  });
+
   it("asks nothing when no role names a company", async () => {
     await save({ experience: [roleWith(["Did things."], { company: "  " })] });
     const body = CompaniesAnswerSchema.parse(await (await post("companies")).json());
