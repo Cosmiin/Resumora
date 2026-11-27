@@ -109,10 +109,14 @@ const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [
 /** One ending off a word, or the word itself when nothing more comes off. Never below three letters. */
 function fold(word: string): string {
   if (word.length <= 3) return word;
+  // Too short for the rules below, and common in answers ("experience using KissFlow").
+  if (word === "using") return "use";
   if (word.length > 4 && /(ies|ied)$/.test(word)) return `${word.slice(0, -3)}y`;
   for (const ending of ["ing", "ed"]) {
-    // "planned" and "planning" are "plan": the doubled consonant goes with the ending.
-    if (word.endsWith(ending) && word.length - ending.length >= 3) return word.slice(0, -ending.length).replace(/([bdgmnprt])\1$/, "$1");
+    if (!word.endsWith(ending) || word.length - ending.length < 3) continue;
+    const rest = word.slice(0, -ending.length);
+    // "planned" and "planning" are "plan": the doubled consonant goes with the ending. "added" stays "add".
+    return rest.length > 3 ? rest.replace(/([bdgmnprt])\1$/, "$1") : rest;
   }
   if (word.endsWith("ed")) return word.slice(0, -1);
   if (word.endsWith("es") && word.length >= 5) return word.slice(0, -2);

@@ -69,6 +69,9 @@ describe("confirmedIn", () => {
     expect(confirmedIn("tracking quality signals", ["Have you ever tracked quality signals to improve operational processes? Yes"])).toBe(true);
     expect(confirmedIn("uses knowledge management systems", ["Used knowledge management systems"])).toBe(true);
     expect(confirmedIn("planned processes and policies", ["Planning a process and a policy"])).toBe(true);
+    expect(confirmedIn("used Kissflow", ["Do you have experience using Kissflow? Yes"])).toBe(true);
+    expect(confirmedIn("added new reports", ["Did you add new reports? Yes"])).toBe(true);
+    expect(confirmedIn("running payroll", ["Did you run payroll? Yes"])).toBe(true);
   });
 
   it("does not confirm a phrase with a word nobody said", () => {
