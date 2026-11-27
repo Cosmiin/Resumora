@@ -297,10 +297,7 @@
 .rc-item { display: inline-flex; gap: var(--space-1); }
 .rc-item.is-no { color: var(--color-muted); }
 .rc-item.is-yes .rc-mark { color: var(--color-good); }
-/* Tools step: one role per screen, its tools as toggle buttons. Dark = ticked; dashed = offered by a neighbouring role. */
-.ep-tools-lead { margin: calc(-1 * var(--space-3)) 0 var(--space-5); color: var(--color-muted); }
-.ep-toolgroup { margin: 0 0 var(--space-5); }
-.ep-toolgroup-title { margin: 0 0 var(--space-2); font-size: var(--text-label); font-weight: var(--weight-bold); letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-muted); }
+/* Tools step: one card per role, its tools as toggle buttons. Dark = ticked; dashed = offered by a neighbouring role, or "Add a tool". */
 .ep-tools { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .ep-tool { display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--control-h); padding: var(--space-1) var(--space-4) var(--space-1) var(--space-3); border: var(--border-control) solid var(--color-ink); border-radius: var(--radius-pill); background: var(--color-paper); color: var(--color-ink); font: inherit; font-weight: var(--weight-semibold); text-align: start; overflow-wrap: anywhere; cursor: pointer; transition: background-color var(--dur-fast); }
 .ep-tool svg { flex: none; }
@@ -308,9 +305,9 @@
 .ep-tool[aria-pressed="true"] { background: var(--color-ink); color: var(--color-on-ink); }
 .ep-tool[aria-pressed="true"]:hover { background: var(--color-ink-hover); }
 .ep-tool.is-near[aria-pressed="false"] { border-style: dashed; }
-.ep-addrow { display: grid; gap: var(--space-2); margin-top: var(--space-6); }
-.ep-addrow label { font-size: var(--text-small); font-weight: var(--weight-bold); }
-.ep-addfield { display: flex; gap: var(--space-2); }
+.ep-tool.is-add { border-style: dashed; border-color: var(--color-muted); color: var(--color-muted); font-weight: var(--weight-regular); }
+.ep-tool:disabled { cursor: default; opacity: 0.6; }
+.ep-addfield { display: flex; gap: var(--space-2); flex: 1 1 16rem; }
 .ep-addfield .ui-input { flex: 1; min-width: 0; max-width: 22rem; }
 /* The path's first screen while the roles are checked: the lines of a CV being read. */
 .ep-reading { display: grid; gap: var(--space-3); width: 100%; max-width: 24rem; margin: var(--space-2) 0; }

@@ -441,8 +441,10 @@ describe("the start of the base CV flow", () => {
     await user.click(within(dialog).getByRole("button", { name: "Start with the questions" }));
     expect(importsApi.applyImport).toHaveBeenCalledWith("imp-1", 1);
     expect(await screen.findByRole("dialog", { name: "Enrich your CV" })).toBeInTheDocument();
-    // The short path waits for the role's score before it can start (no score arrives in this test).
-    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+    // No second start screen: the path waits for the role's score, then goes on by itself (no score arrives in this test).
+    expect(await screen.findByRole("heading", { name: "Reading your CV…" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Skip for now" })).toBeEnabled();
   });
 
   it("prepares the questions while the found CV is on screen: the score, the companies and the tools are asked for once", async () => {
@@ -461,11 +463,12 @@ describe("the start of the base CV flow", () => {
     await waitFor(() => expect(enrichApi.suggestTools).toHaveBeenCalledWith("imp-1"));
     expect(enrichApi.scoreAhead).toHaveBeenCalledWith("imp-1", "e1", print);
     expect(enrichApi.suggestCompanies).toHaveBeenCalledWith("imp-1");
+    // The score shows on the import screen itself, next to what was found.
+    expect(await within(dialog).findByText("Your CV: 80")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Start with the questions" }));
     const path = await screen.findByRole("dialog", { name: "Enrich your CV" });
-    // The score is there already: no "Reading your CV…" again.
-    expect(await within(path).findByRole("heading", { name: "Your CV: 80" })).toBeInTheDocument();
-    await user.click(within(path).getByRole("button", { name: "Start" }));
+    // The score is there already: no second start screen, straight into the steps.
+    expect(within(path).queryByRole("button", { name: "Start" })).toBeNull();
     // The one company is known, so the companies step saves it and moves on to the tools, which are there too.
     expect(await within(path).findByRole("button", { name: "Jira" })).toBeInTheDocument();
     expect(enrichApi.scoreRole).not.toHaveBeenCalled();

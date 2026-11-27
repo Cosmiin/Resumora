@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { moveOtherTo, SCAN_WARNING, type CvResponse, type SaveResponse, type ImportResult, type MoveTarget } from "@resumora/shared";
+import { moveOtherTo, PATH_BUDGET, SCAN_WARNING, type CvResponse, type SaveResponse, type ImportResult, type MoveTarget } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import { conflictFrom, isConflict, type Conflict } from "../cv/useAutosave.ts";
 import { CvDocument } from "../cv/page/CvDocument.tsx";
@@ -35,10 +35,12 @@ export function ImportScreen(props: {
   onClose(): void;
   /** The CV is read (as found, before any correction made here): what comes next can be prepared while it is looked at. */
   onFound?(cv: CvContent): void;
+  /** The found CV's score, once every role is scored: shown here, so the questions start without a second start screen. */
+  score?: number;
   onApplied(cv: CvResponse, next: AfterImport): void;
   onConflict(conflict: Conflict): void;
 }) {
-  const { importId, canApply, replaces, currentVersion, onClose, onFound, onApplied, onConflict } = props;
+  const { importId, canApply, replaces, currentVersion, onClose, onFound, score, onApplied, onConflict } = props;
   const [slow, setSlow] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applyFailed, setApplyFailed] = useState(false);
@@ -170,7 +172,11 @@ export function ImportScreen(props: {
               <div className="import-right">
                 {result.isScan && <p role="alert" className="ui-notice import-gap">{t("import.scan")}</p>}
                 <div inert={applying}><ConfirmList warnings={confirms} cv={cv} onChange={change} /></div>
-                {roles.length > 0 && <p className="ui-coach import-next">{t("import.found.next")}</p>}
+                {roles.length > 0 && (
+                  // The place is kept while the roles are scored, so nothing moves when the number arrives.
+                  <p className="import-score" aria-live="polite">{score !== undefined && t("enrich.path.v2.score", { n: score })}</p>
+                )}
+                {roles.length > 0 && <p className="ui-coach import-next">{t("import.found.next", { k: PATH_BUDGET })}</p>}
                 {replaces && <p className="fm-fine">{t("import.summary.kept")}</p>}
                 {applyFailed && <p role="alert" className="ui-notice ui-notice--bad">{t("import.applyError")}</p>}
                 {movesFailed && <p role="alert" className="ui-notice ui-notice--bad">{t("import.movesError")}</p>}

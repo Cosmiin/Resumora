@@ -57,7 +57,7 @@ describe("CompaniesStep", () => {
     expect(screen.queryByText(/Robert Half/)).toBeNull();
     expect(screen.queryByText("Staffing and recruitment firm.")).toBeNull();
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
-    expect(screen.getByText("We recognised 1 company and filled in what it does. You will see it in the review at the end.")).toBeInTheDocument();
+    expect(screen.getByText("We recognised 1 company and filled in what it does.")).toBeInTheDocument();
     await userEvent.click(next());
     expect((onDone.mock.calls[0]![0] as Saved).find((s) => s.roleId === "c")!.note).toMatchObject({ question: "What does Robert Half do?", answer: "Staffing and recruitment firm.", via: ["pick"] });
   });
@@ -134,8 +134,9 @@ describe("CompaniesStep", () => {
 describe("ToolsStep", () => {
   const cv: CvContent = { ...emptyCv("en"), experience: [
     role("a", { title: "Analyst", bullets: [{ id: "b1", text: "Built reports in Excel." }] }),
-    role("b", { title: "Planner" }),
-    role("c", { title: "Clerk" }),
+    role("b", { title: "Planner", bullets: [{ id: "b2", text: "Planned the weekly routes." }] }),
+    role("c", { title: "Clerk", bullets: [{ id: "b3", text: "Filed the invoices." }] }),
+    role("d", { title: "Volunteer" }),
   ] };
 
   beforeEach(() => {
@@ -144,73 +145,69 @@ describe("ToolsStep", () => {
       { roleId: "a", tools: ["Excel", "SAP"] },
       { roleId: "b", tools: ["SAP"] },
       { roleId: "c", tools: [] },
+      { roleId: "d", tools: ["Canva"] },
     ] });
   });
 
-  const tool = (name: string) => screen.queryByRole("button", { name });
-  const ticked = (name: string) => expect(tool(name)).toHaveAttribute("aria-pressed", "true");
-  const unticked = (name: string) => expect(tool(name)).toHaveAttribute("aria-pressed", "false");
-  const press = (name: string) => userEvent.click(screen.getByRole("button", { name }));
-  const onRole = (title: string) => expect(screen.getByTestId("ep-rolecard")).toHaveTextContent(title);
-  const addBox = () => screen.getByRole("textbox", { name: "Add a tool that is missing" });
-  /** The first role's screen, once the suggestions are in. */
+  /** A role's card on the one screen. */
+  const card = (title: string) => within(screen.getByRole("group", { name: title }));
+  const tool = (title: string, name: string) => card(title).queryByRole("button", { name });
+  const ticked = (title: string, name: string) => expect(tool(title, name)).toHaveAttribute("aria-pressed", "true");
+  const unticked = (title: string, name: string) => expect(tool(title, name)).toHaveAttribute("aria-pressed", "false");
+  const press = (title: string, name: string) => userEvent.click(card(title).getByRole("button", { name }));
+  const add = async (title: string, name: string) => {
+    await press(title, "Add a tool");
+    await userEvent.type(card(title).getByRole("textbox", { name: "Tool name" }), `${name}{Enter}`);
+  };
+  const done = () => userEvent.click(screen.getByRole("button", { name: "Continue" }));
+  /** The screen, once the suggestions are in. */
   const open = async (content = cv, onDone = vi.fn()) => {
     render(<ToolsStep cv={content} onDone={onDone} />);
-    await screen.findByRole("button", { name: "Excel" });
+    await screen.findAllByRole("button", { name: "Excel" });
     return onDone;
   };
 
-  it("shows one role at a time, ticks a tool the role already names, and saves only the roles that changed", async () => {
+  it("shows every role with a line on one screen, ticks a tool the role already names, and saves only the roles that changed", async () => {
     const onDone = await open();
-    onRole("Analyst");
-    expect(screen.getByText("Step 3 of 4 · Role 1 of 3")).toBeInTheDocument();
-    ticked("Excel");
-    unticked("SAP");
-    expect(tool("Back")).toBeNull();
-    await press("Next role");
-    onRole("Planner");
-    expect(screen.getByText("Step 3 of 4 · Role 2 of 3")).toBeInTheDocument();
-    await press("SAP");
-    await press("Next role");
-    onRole("Clerk");
-    expect(tool("Next role")).toBeNull();
-    await press("Continue");
+    expect(screen.getByText("Step 3 of 4")).toBeInTheDocument();
+    expect(screen.getAllByRole("group").map((g) => g.getAttribute("aria-labelledby"))).toHaveLength(3);
+    ticked("Analyst", "Excel");
+    unticked("Analyst", "SAP");
+    unticked("Planner", "SAP");
+    await press("Planner", "SAP");
+    await done();
     const saved: Saved = onDone.mock.calls[0]![0];
     expect(saved).toHaveLength(1);
     expect(saved[0]).toMatchObject({ roleId: "b", note: { question: "Which tools did you use?", answer: "SAP", via: ["pick"] } });
   });
 
+  it("a role with no written line is not shown and gets no note", async () => {
+    const onDone = await open();
+    expect(screen.queryByRole("group", { name: "Volunteer" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Canva" })).toBeNull();
+    await done();
+    expect(onDone).toHaveBeenCalledWith([]);
+  });
+
   it("unticking a tool the role names saves the rest", async () => {
     const onDone = await open();
-    await press("SAP");
-    await press("Excel");
-    await press("Next role");
-    await press("Next role");
-    await press("Continue");
+    await press("Analyst", "SAP");
+    await press("Analyst", "Excel");
+    await done();
     const saved: Saved = onDone.mock.calls[0]![0];
     expect(saved).toHaveLength(1);
     expect(saved[0]).toMatchObject({ roleId: "a", note: { answer: "SAP" } });
   });
 
-  it("a tool added on one role is offered on the roles just before and after it", async () => {
+  it("a tool ticked on one role is offered on the roles just before and after it, not further", async () => {
     await open();
-    await press("Next role");
-    await press("Next role");
-    onRole("Clerk");
-    // Excel is ticked on Analyst only, two roles away.
-    expect(tool("Excel")).toBeNull();
-    await press("Back");
-    onRole("Planner");
-    await userEvent.type(addBox(), "Jira{Enter}");
-    ticked("Jira");
-    expect(addBox()).toHaveValue("");
-    await press("Back");
-    onRole("Analyst");
-    unticked("Jira");
-    await press("Next role");
-    await press("Next role");
-    onRole("Clerk");
-    unticked("Jira");
+    // Excel is ticked on Analyst only: offered on Planner, the next card, and not on Clerk, two cards away.
+    unticked("Planner", "Excel");
+    expect(tool("Clerk", "Excel")).toBeNull();
+    await add("Planner", "Jira");
+    ticked("Planner", "Jira");
+    unticked("Analyst", "Jira");
+    unticked("Clerk", "Jira");
   });
 
   it("a tool the role names is offered past the first eight suggestions, and stays in the saved answer", async () => {
@@ -221,75 +218,26 @@ describe("ToolsStep", () => {
     const named: CvContent = { ...cv, experience: [cv.experience[0]!, cv.experience[1]!, role("c", { title: "Clerk", bullets: [{ id: "x", text: "Kept stock in Excel." }] })] };
     // Analyst's own line names Excel, though no suggestion for Analyst does.
     const onDone = await open(named);
-    ticked("Excel");
-    await press("Next role");
-    await press("Next role");
-    onRole("Clerk");
-    ticked("Excel");
-    await userEvent.type(addBox(), "SAP");
-    await press("Add");
-    ticked("SAP");
-    await press("Continue");
+    ticked("Analyst", "Excel");
+    ticked("Clerk", "Excel");
+    await press("Clerk", "Add a tool");
+    await userEvent.type(card("Clerk").getByRole("textbox", { name: "Tool name" }), "SAP");
+    await press("Clerk", "Add");
+    ticked("Clerk", "SAP");
+    await done();
     expect((onDone.mock.calls[0]![0] as Saved).find((s) => s.roleId === "c")!.note.answer).toBe("Excel, SAP");
   });
 
-  it("a tool added on a role stays offered there when unticked", async () => {
+  it("a tool added on a role stays offered there when unticked, and the field is ready for another", async () => {
     await open();
-    await press("Next role");
-    await press("Next role");
-    await userEvent.type(addBox(), "Jira{Enter}");
-    await press("Jira");
-    unticked("Jira");
-  });
-
-  it("groups a role's tools under their headings", async () => {
-    await open();
-    const group = (name: string) => within(screen.getByRole("group", { name }));
-    expect(group("Named in your CV").getByRole("button", { name: "Excel" })).toBeInTheDocument();
-    expect(group("Often used in this kind of role").getByRole("button", { name: "SAP" })).toBeInTheDocument();
-    await press("Next role");
-    // Excel is ticked on Analyst, the role before.
-    expect(group("From the role before or after").getByRole("button", { name: "Excel" })).toBeInTheDocument();
-    await userEvent.type(addBox(), "Jira{Enter}");
-    expect(group("Added by you").getByRole("button", { name: "Jira" })).toBeInTheDocument();
-  });
-
-  it("Skip saves nothing for the role on screen, also on the last role", async () => {
-    const onDone = await open();
-    await press("SAP");
-    await press("Skip");
-    onRole("Planner");
-    await press("Back");
-    // Analyst is back to what its text names.
-    ticked("Excel");
-    unticked("SAP");
-    await press("Next role");
-    await press("SAP");
-    await press("Next role");
-    onRole("Clerk");
-    await userEvent.type(addBox(), "Jira{Enter}");
-    await press("Skip");
-    expect(onDone).toHaveBeenCalledTimes(1);
-    expect((onDone.mock.calls[0]![0] as Saved).map((s) => s.roleId)).toEqual(["b"]);
-  });
-
-  it("Back returns to the role before, with its ticks kept", async () => {
-    await open();
-    await press("SAP");
-    await press("Next role");
-    await press("SAP");
-    await press("Back");
-    onRole("Analyst");
-    ticked("SAP");
-    await press("Next role");
-    onRole("Planner");
-    ticked("SAP");
+    await add("Clerk", "Jira");
+    expect(card("Clerk").getByRole("textbox", { name: "Tool name" })).toHaveValue("");
+    await press("Clerk", "Jira");
+    unticked("Clerk", "Jira");
   });
 
   it("Continue saves once, even when clicked twice", async () => {
     const onDone = await open();
-    await press("Next role");
-    await press("Next role");
     const button = screen.getByRole("button", { name: "Continue" });
     await userEvent.click(button);
     await userEvent.click(button);
@@ -297,11 +245,11 @@ describe("ToolsStep", () => {
     expect(button).toBeDisabled();
   });
 
-  it("waits for the suggestions before a role can be answered", async () => {
+  it("waits for the suggestions before the tools can be answered", async () => {
     api.suggestTools.mockReturnValue(new Promise(() => {}));
     render(<ToolsStep cv={cv} onDone={vi.fn()} />);
     expect(screen.getByText("Finding the usual tools for your roles…")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Next role" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
   it("uses the tools prepared while the import was on screen, and asks again only if that failed", async () => {
@@ -313,7 +261,7 @@ describe("ToolsStep", () => {
     const failed = Promise.reject(new Error("used in the meantime"));
     failed.catch(() => undefined);
     render(<ToolsStep cv={cv} prepared={failed} onDone={vi.fn()} />);
-    await screen.findByRole("button", { name: "Excel" });
+    await screen.findAllByRole("button", { name: "Excel" });
     expect(api.suggestTools).toHaveBeenCalledTimes(1);
   });
 
@@ -321,11 +269,8 @@ describe("ToolsStep", () => {
     api.suggestTools.mockRejectedValue(new Error("down"));
     const onDone = vi.fn();
     render(<ToolsStep cv={cv} onDone={onDone} />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Next role" })).toBeEnabled());
-    await press("Next role");
-    await press("Next role");
-    await press("Continue");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled());
+    await done();
     expect(onDone).toHaveBeenCalledWith([]);
   });
 });
-

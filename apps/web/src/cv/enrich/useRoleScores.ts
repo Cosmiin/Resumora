@@ -49,6 +49,8 @@ export function useRoleScores({ cv, status, ahead = null }: Props): {
   retry(roleId: string): void;
   /** Takes a score asked for elsewhere (a role's run), so every place shows the same number. */
   put(result: RoleResult): void;
+  /** Each role's score for the import not used yet (null: nothing to score), once every one of them is in; null until then. */
+  aheadScores?: ReadonlyMap<string, number | null> | null;
 } {
   const { locale } = cv;
   // Roles and volunteering are scored, in that order (one list, kept stable between renders). Projects are not.
@@ -195,5 +197,16 @@ export function useRoleScores({ cv, status, ahead = null }: Props): {
     }, [experience, locale, results, failed, inFlight]),
     retry,
     put,
+    aheadScores: useMemo(() => {
+      if (!ahead) return null;
+      const out = new Map<string, number | null>();
+      for (const role of aheadItems) {
+        const result = results.get(role.id);
+        if (!hasBullets(role)) out.set(role.id, null);
+        else if (isCurrent(result, printOf(role, ahead.cv.locale))) out.set(role.id, result.score);
+        else return null;
+      }
+      return out;
+    }, [ahead, aheadItems, results]),
   };
 }
