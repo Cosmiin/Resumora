@@ -68,7 +68,7 @@ export function GapQuestions({ questions, roles, locale, answers = [], busy, onS
       const visible = open ? ordered : first;
       const more = ordered.length - visible.length;
       const heading = `gap-${question.id}`;
-      return <div key={question.id} role="group" aria-labelledby={heading} className="ui-sheet tailor-gap">
+      return <div key={question.id} role="group" aria-labelledby={heading} className="ui-sheet tailor-gaprow">
         <h2 className="ui-heading" id={heading}>{question.text}</h2>
         {question.hint && suggested.length > 0 && <p className="ui-small ui-muted">{t("tailor.gaps.hint", { hint: question.hint })}</p>}
         <div className="answer-opts">

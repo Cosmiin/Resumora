@@ -2,7 +2,7 @@ import { isRoleSection, stepItems, type CvContent, type JobExtraction, type Matc
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError, type LogFn } from "../errors.ts";
-import { mergeStep, scoreTailored, type AcceptBody } from "./accept.ts";
+import { mergeStep, scoreTailored, type AcceptBody, type ItemReview } from "./accept.ts";
 import { layoutProposals } from "./layout-pass.ts";
 import type { TailorRepo } from "./repo.ts";
 import { passProposals } from "./section-pass.ts";
@@ -11,6 +11,7 @@ import { jobNotFound } from "./start.ts";
 /** How many times a step saves when other steps keep saving the tailored CV first. */
 const MAX_SAVES = 5;
 const NO_CHOICES: AcceptBody = { decisions: [], inferred: [], flags: [] };
+const HEADLINE_WAITS: AcceptBody = { ...NO_CHOICES, decisions: [{ itemId: "headline", keep: false }] };
 
 /**
  * One step made and written straight into the tailored CV: its proposals as the step-by-step routes make them, the
@@ -32,14 +33,17 @@ export async function writeStep(
   if (isRoleSection(section) && (!roleId || !(run.roleOrder ?? []).includes(roleId) || !stepItems(input.cv, section).some((item) => item.id === roleId))) {
     throw new ApiError(409, "role_not_current", "This role isn't part of this run.");
   }
-  const made = section === "layout" ? { proposals: await layoutProposals(deps, input), removed: 0 }
+  const made = section === "layout" ? { proposals: await layoutProposals(deps, { ...input, fromBase: true }), removed: 0 }
     : await passProposals(deps, { userId: input.userId, run, job: input.job, cv: input.cv, section, roleId });
 
   for (let save = 0; save < MAX_SAVES; save++) {
     const doc = run.tailoredCvId ? await deps.tailor.readTailoredCv(run.tailoredCvId) : null;
     if (!doc) throw jobNotFound();
     // A role written again starts from its Base wording, so writing a step twice gives the same CV as writing it once.
-    const merged = await mergeStep(deps, { run, job: input.job, section, roleId, body: NO_CHOICES, doc, proposals: made.proposals, fromBase: true });
+    const merged = await mergeStep(deps, { run, job: input.job, section, roleId, body: section === "layout" ? HEADLINE_WAITS : NO_CHOICES, doc, proposals: made.proposals, fromBase: true });
+    // The headline is the person's own choice on the final page: proposed here, not applied and not yet decided.
+    const headline = section === "layout" ? (merged.review.layout as Record<string, ItemReview> | undefined)?.headline : undefined;
+    if (headline) headline.reviewed = false;
     const saved = await deps.tailor.saveTailoredCv(doc.id, doc.version, { content: merged.content, review: merged.review, score: doc.score, scoreStale: true });
     if (saved === "ok") return { changed: merged.changed, removed: made.removed };
   }

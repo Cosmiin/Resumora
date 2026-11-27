@@ -94,6 +94,14 @@ size: ~220 lines
 
 **Acceptance tests.** API: a layout write leaves the titles as they were and stores the headline as not kept; keep and remove for `headline` and for `layout`; the doubled title is dropped. Web: the list from a review state (changed line, new skill, order, headline, unchanged parts); Undo calls the review route and marks the row; a failed undo; the headline's two choices; the download buttons call the export with the saved template.
 
+**Rulings made while building.**
+- `apps/api/src/tailor/layout-pass.ts` is touched too: a layout step written with `steps/write` starts from the Base order and titles (so writing it twice gives the same CV, and a headline picked earlier is not built on), and its proposals are compared with the Base order and headline for the same reason.
+- `PATCH /v1/tailored/:id/review` also learns `order` and `hide:<id>` of the lighter sections (achievements, courses, publications, interests): remove puts the Base order back, or shows the item again. Without it those applied changes would have no Undo on the final page. An order or a hidden item cannot be edited (400).
+- The API tests for the review route live in `apps/api/test/tailor-write-step.test.ts` (there is no `tailor-review-item.test.ts`).
+- `GapQuestions` used the class `tailor-gap`, which the final page already uses for spacing; its rows are `tailor-gaprow` now.
+- After an undo or a headline choice on the final page, one line says the match shown is from before that change and links to the job page, where it can be checked again.
+- `DoneScreen` takes `failed` (the parts that could not be tailored) and names them; B4 passes it.
+
 ### Task B4: The flow uses the new screens, and the old ones go
 ```
 files: apps/web/src/tailor/TailorFlow.tsx, apps/web/src/tailor/flow-phase.ts, apps/web/src/tailor/Working.tsx, apps/web/src/tailor/Room.tsx, the review and question screens the flow no longer opens with their tests, apps/web/src/i18n/en-tailor.ts, apps/web/src/i18n/ro-tailor.ts, apps/web/src/styles/tailor.css
