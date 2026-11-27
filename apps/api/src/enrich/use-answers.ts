@@ -28,6 +28,10 @@ Read the answers. For each fact in them that the role's page (title, description
   description. Return the whole new description, keeping everything it already says.
 - Size, tools and results go into the line they belong to: return that line's id and its whole new text. When no line
   fits, return a new line with id null.
+- An answer that names a line ("line") was given about that line: its fact goes into that line and into no other.
+- A fact goes in one place only. Never write the same fact into two lines, or into a line and the description.
+- A tool the person ticked for the whole role goes into the one line whose work was most plainly done with it. A tool
+  that fits no line is left out: never write a line that only lists tools.
 - Skip answers that say no, none, not sure or I don't know: they add nothing.
 - Add nothing that is not in the answers or on the page. Keep every number exactly as written.
 - Each line is one sentence, starting with a verb, at most ${CONCISE_CHARS.partial} characters, in the tense of the
@@ -39,6 +43,7 @@ whole line } ] }.`;
 }
 
 function placeAnswersUserMessage(role: Experience, notes: readonly Note[]): string {
+  const lines = new Set(role.bullets.map((b) => b.id));
   return [
     "<experience>",
     `Role title: ${JSON.stringify(role.title)}`,
@@ -47,7 +52,7 @@ function placeAnswersUserMessage(role: Experience, notes: readonly Note[]): stri
     `Lines (JSON, each { id, text }): ${JSON.stringify(role.bullets.map((b) => ({ id: b.id, text: b.text })))}`,
     "</experience>",
     "<answers>",
-    JSON.stringify(notes.map(({ question, answer }) => ({ question, answer }))),
+    JSON.stringify(notes.map(({ question, answer, bulletId }) => ({ question, answer, ...(bulletId !== undefined && lines.has(bulletId) ? { line: bulletId } : {}) }))),
     "</answers>",
   ].join("\n");
 }

@@ -7,6 +7,7 @@ import {
   hasBlank,
   RoleResultSchema,
   SCORE_POLICY,
+  answeredTopics,
   band,
   buildRoleResult,
   bulletScore,
@@ -356,6 +357,22 @@ describe("mergeGrades role questions", () => {
     ]);
     expect(result.lines).toBe(80);
     expect(result.fingerprint).toBe("new");
+  });
+});
+
+describe("answeredTopics", () => {
+  const note = (over: object) => ({ id: "n", question: "Q", answer: "A", via: ["type" as const], askedAt: "2026-11-05T00:00:00Z", ...over });
+  it("lists the topics the role's enrichment notes cover", () => {
+    const topics = answeredTopics({ notes: [note({ topic: "company" }), note({ topic: "leadership" }), note({ bulletId: "b1" })] });
+    expect([...topics].sort()).toEqual(["company", "leadership"]);
+  });
+  it("knows an older tools note by its question, in either language", () => {
+    expect(answeredTopics({ notes: [note({ question: "Which tools did you use?" })] }).has("tools")).toBe(true);
+    expect(answeredTopics({ notes: [note({ question: "Ce instrumente ai folosit?" })] }).has("tools")).toBe(true);
+  });
+  it("leaves out \"other\" and the notes given for a job", () => {
+    const topics = answeredTopics({ notes: [note({ topic: "other" }), note({ topic: "tools", jobId: "7d9f3c1e-1b1a-4c58-9f0e-0d2c7c1a2b3c" })] });
+    expect(topics.size).toBe(0);
   });
 });
 

@@ -92,6 +92,14 @@ describe("CvContentSchema", () => {
     expect(NoteSchema.safeParse({ ...note, jobId: "invalid" }).success).toBe(false);
   });
 
+  it("a note may say which line or which role topic its question was about", () => {
+    const note = { id: "n1", question: "Q", answer: "A", via: ["type"], askedAt: "2026-11-05T00:00:00Z" };
+    expect(NoteSchema.safeParse({ ...note, bulletId: "b1" }).success).toBe(true);
+    expect(NoteSchema.safeParse({ ...note, topic: "tools" }).success).toBe(true);
+    expect(NoteSchema.safeParse({ ...note, topic: "salary" }).success).toBe(false);
+    expect(NoteSchema.safeParse({ ...note, bulletId: "" }).success).toBe(false);
+  });
+
   it("validates enrichment and job note limits separately", () => {
     const notes = Array.from({ length: MAX_NOTES }, (_, i) => ({
       id: `n${i}`, question: "Q", answer: "A", via: ["type"], askedAt: "2026-11-05T00:00:00Z",

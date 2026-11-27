@@ -34,6 +34,18 @@ describe("checkProposal", () => {
     expect(checkProposal(role, b2!.id, "Answered 10–50 calls a week.")).toBe("ok");
     expect(checkProposal(role, b2!.id, "Answered 30 calls a week.")).toBe("number");
   });
+  it("a number from an answer given about another line is not this line's to use", () => {
+    const told = { ...role, notes: [{ ...note("6–10 projects", "How many projects?"), bulletId: b1!.id }, note("For 3 clients", "Who was it for?")] };
+    // The line the answer was about may carry its number; the other line may not.
+    expect(checkProposal(told, b1!.id, "Prepared contracts for 40 workers across 6–10 projects.")).toBe("ok");
+    expect(checkProposal(told, b2!.id, "Answered phones for 6–10 projects.")).toBe("number");
+    // An answer about the whole role stays open to every line, and so does one about a line that is gone.
+    expect(checkProposal(told, b2!.id, "Answered phones for 3 clients.")).toBe("ok");
+    const gone = { ...told, notes: [{ ...note("6–10 projects", "How many projects?"), bulletId: "removed-line" }] };
+    expect(checkProposal(gone, b2!.id, "Answered phones for 6–10 projects.")).toBe("ok");
+    // A new line may use any answer.
+    expect(checkProposal(told, "new", "Ran 6–10 projects a year.")).toBe("ok");
+  });
   it("drops 441 characters or more", () => {
     expect(checkProposal(role, b2!.id, "x".repeat(440))).toBe("ok");
     expect(checkProposal(role, b2!.id, "x".repeat(441))).toBe("length");

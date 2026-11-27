@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  BRAIN_DUMP_QUESTION, CLEAR_AT, MAX_LONG_TEXT, PATH_BUDGET, findGraded, fingerprint, gradedItems, newId, pickBudget, questionKey,
+  BRAIN_DUMP_QUESTION, CLEAR_AT, MAX_LONG_TEXT, PATH_BUDGET, answeredTopics, findGraded, fingerprint, gradedItems, newId, pickBudget, questionKey,
   type BudgetItem, type Change, type CvContent, type HeldAsk, type Note, type RoleResult,
 } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
@@ -150,10 +150,11 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   // Answering the same screen again (after Back) replaces its note, as in a role's own run. One slot per screen of
   // this round: two lines with the same wording keep two notes, and a new round starts with new notes.
   const noteIds = useRef(new Map<string, string>());
-  const save = (slot: string, roleId: string, question: string, answer: string, via: Via[]) => {
+  // about: the line or the role topic the question was about, so the answer is used where it belongs and not asked again.
+  const save = (slot: string, roleId: string, question: string, answer: string, via: Via[], about: Pick<Note, "bulletId" | "topic"> = {}) => {
     const id = noteIds.current.get(slot) ?? newId();
     noteIds.current.set(slot, id);
-    const note: Note = { id, question, answer: answer.trim().slice(0, MAX_LONG_TEXT), via: via.length ? via : ["type"], askedAt: new Date().toISOString() };
+    const note: Note = { id, question, answer: answer.trim().slice(0, MAX_LONG_TEXT), via: via.length ? via : ["type"], askedAt: new Date().toISOString(), ...about };
     dispatch({ type: "setNote", roleId, note });
   };
   const budget = (): BudgetItem[] => {
@@ -161,7 +162,10 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
     return pickBudget({
       items: gradedItems(latest.current).map(({ item }) => {
         const entry = latestScores.current.get(item.id);
-        return { id: item.id, result: entry?.state === "ready" ? entry.result : undefined };
+        const result = entry?.state === "ready" ? entry.result : undefined;
+        // A topic the role's notes already cover is not asked again in other words.
+        const known = answeredTopics(item);
+        return { id: item.id, result: result && { ...result, roleQuestions: result.roleQuestions.filter((q) => !known.has(q.topic)) } };
       }),
       weights: strengthWeights(latest.current), asked: known, size: PATH_BUDGET,
     });
@@ -324,7 +328,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
    */
   const placeFact = async (roleId: string, change: Change, ask: HeldAsk, answer: string, via: Via[]) => {
     // One note per line: trying again after a failure replaces the answer instead of adding a second one.
-    save(`held|${roleId}|${change.id}`, roleId, ask.text, answer, via);
+    save(`held|${roleId}|${change.id}`, roleId, ask.text, answer, via, change.kind === "bullet" ? { bulletId: change.bulletId } : {});
     await waitForSave();
     const now = latest.current;
     const item = findGraded(now, roleId)?.item;
@@ -431,7 +435,8 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
     return screen(
       <BudgetStep cv={cv} items={stage.items}
         onAnswer={(item, text, via) => {
-          save(`${item.roleId}|${item.kind === "line" ? `line:${item.question.bulletId}` : `role:${item.question.id}`}|${questionKey(item.question.text)}`, item.roleId, item.question.text, text, via);
+          save(`${item.roleId}|${item.kind === "line" ? `line:${item.question.bulletId}` : `role:${item.question.id}`}|${questionKey(item.question.text)}`, item.roleId, item.question.text, text, via,
+            item.kind === "line" ? { bulletId: item.question.bulletId } : { topic: item.question.topic });
           const g = gotFor(item.roleId, item.question.text);
           if (item.kind === "line") g.lines.add(item.question.bulletId);
           else if (item.question.topic === "purpose") g.context = true;

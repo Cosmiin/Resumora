@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CORE_PARAMETERS, band, type Experience, type RoleResult, type ScoredKind } from "@resumora/shared";
+import { CORE_PARAMETERS, answeredTopics, band, type Experience, type RoleResult, type ScoredKind } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { SCORED_LIST, type RoleList } from "../edit/lists.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
@@ -67,7 +67,7 @@ function RoleNext({ role, name, state, onAnswer, onRetry }: { role: Experience; 
   }
   const next = nextStepOf(result);
   const answered = new Set(role.notes.map((note) => questionKey(note.question)));
-  const questions = Math.min(RUN_MAX, buildRun(result, { thin: role.bullets.length <= 1 || result.thin, answered }).length);
+  const questions = Math.min(RUN_MAX, buildRun(result, { thin: role.bullets.length <= 1 || result.thin, answered, known: answeredTopics(role) }).length);
   return (
     <>
       <p className="role-num"><b>{n}</b> <span>{name}</span></p>

@@ -30,6 +30,14 @@ describe("the questions of a role, in the order a run asks them", () => {
     expect(keys(rest)).toEqual(["line:b2", "line:b3"]);
   });
 
+  it("leaves out a question about the role on a topic the role's notes already cover, whatever its wording", () => {
+    const all = buildRun(result(
+      [rq("c", "company"), rq("t", "tools", "What tools, software, or methods did you use?"), rq("l", "leadership"), rq("o", "other")],
+      [lq("b1")],
+    ), { thin: false, answered: none, known: new Set<RoleTopic>(["tools", "company"]) });
+    expect(keys(all)).toEqual(["role:l", "line:b1", "role:o"]);
+  });
+
   it("a thin role opens with its box, counted as the first question", () => {
     const all = buildRun(result([rq("c", "company")], [lq("b1")], true), { thin: true, answered: none });
     expect(keys(all)).toEqual(["box", "role:c", "line:b1"]);

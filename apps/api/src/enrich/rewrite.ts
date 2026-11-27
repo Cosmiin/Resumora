@@ -7,9 +7,15 @@ import { BlockParser, type BlockEvent } from "./blocks.ts";
 const SUMMARY_MAX = 600;
 export const squash = (s: string) => s.trim().replace(/\s+/g, " ");
 
-/** Texts whose numbers a proposal may repeat: the role's own words and the person's answers. */
-export function roleSources(role: Experience): string[] {
-  return [role.title, role.description, ...role.bullets.map((b) => b.text), ...role.notes.flatMap((n) => [n.question, n.answer])];
+/**
+ * Texts whose numbers a proposal may repeat: the role's own words and the person's answers. For one line (`bulletId`),
+ * an answer given about another line of the role is left out: its number belongs to that line.
+ */
+export function roleSources(role: Experience, bulletId?: string): string[] {
+  const lines = new Set(role.bullets.map((b) => b.id));
+  const notes = bulletId === undefined ? role.notes
+    : role.notes.filter((n) => n.bulletId === undefined || n.bulletId === bulletId || !lines.has(n.bulletId));
+  return [role.title, role.description, ...role.bullets.map((b) => b.text), ...notes.flatMap((n) => [n.question, n.answer])];
 }
 
 /** The current summary and all of every role's text. */
@@ -28,7 +34,7 @@ export function checkProposal(role: Experience, key: string, text: string): "ok"
   const clean = squash(text);
   if (!clean || (original && squash(original.text) === clean)) return "unchanged";
   if (clean.length > PROPOSAL_MAX) return "length";
-  if (hasUnknownNumber(clean, roleSources(role))) return "number";
+  if (hasUnknownNumber(clean, roleSources(role, original?.id))) return "number";
   return "ok";
 }
 

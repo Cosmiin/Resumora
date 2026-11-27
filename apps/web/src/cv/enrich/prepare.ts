@@ -47,6 +47,37 @@ export function toChanges(changes: readonly PrepChange[]): PathChange[] {
 }
 
 /**
+ * A role's prepared changes with the facts placed from its answers (use-answers), for a role's own run: a placed line
+ * replaces the text of the role's own change for that line (or of the new line it was sent as), a placed description
+ * replaces the description's; a line not changed before becomes a change, in the role's line order, before new lines.
+ * `sent` is `toChanges(changes)`, as it was sent: the two lists match one to one.
+ */
+export function withPlacedChanges(
+  changes: readonly PrepChange[], sent: readonly PathChange[], placed: readonly PathChange[],
+  role: { description: string; bullets: readonly { id: string; text: string }[] },
+): PrepChange[] {
+  const out = [...changes];
+  for (const c of placed) {
+    if (c.kind === "description") {
+      const i = out.findIndex((x) => x.kind === "description");
+      if (i >= 0) out[i] = { ...out[i]!, after: c.text };
+      else out.unshift({ id: "description", kind: "description", before: role.description, after: c.text });
+    } else if (c.kind === "bullet") {
+      const asNew = sent.findIndex((x) => x.kind === "new" && x.id === c.bulletId);
+      const i = asNew >= 0 ? out.findIndex((x) => x.id === changes[asNew]!.id) : out.findIndex((x) => x.kind === "bullet" && x.bulletId === c.bulletId);
+      const line = role.bullets.find((b) => b.id === c.bulletId);
+      if (i >= 0) out[i] = { ...out[i]!, after: c.text };
+      else if (line) {
+        const order = role.bullets.map((b) => b.id);
+        const before = out.findIndex((x) => x.kind === "new" || (x.kind === "bullet" && order.indexOf(x.bulletId) > order.indexOf(line.id)));
+        out.splice(before < 0 ? out.length : before, 0, { id: `bullet:${line.id}`, kind: "bullet", bulletId: line.id, before: line.text, after: c.text });
+      }
+    } else if (c.kind === "new") out.push({ id: `new:${c.id}`, kind: "new", before: "", after: c.text });
+  }
+  return out;
+}
+
+/**
  * The changes for one role of the saved CV (the short path's preparing step): a rewrite for every line answered about
  * and every other line below CLEAR_AT (or every line below 100 when the role got an answer about the whole role, as in
  * a role's own run), new lines from the answers of a thin role, and a description when asked. The CV must be saved

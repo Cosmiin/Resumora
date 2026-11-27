@@ -40,3 +40,36 @@ Notes:
   (same as a skipped held line: off the CV).
 - Seen in a browser (questions step only, sample data): the folded answer, the count, the role staying on top.
 - No auth, RLS, migration or API change.
+
+## Part B: published
+PR 101 merged (0374b3db) and published on 27 Nov 2026: website bundle index-BA1NzsNh.js (the API had not changed).
+
+## Part C (Tasks 6–7): a note says what it is about; one answer lands once — done
+session: Scurtează fluxul de îmbogățire · builder: claude
+commit: see the branch (base 0374b3db) · reviews: 1 (Opus, whole part) · fix rounds: see below · guard denials: 0
+open: none
+
+Trial with the real AI (`eval/enrich/once.eval.ts`, fictional role modelled on the run of 27 Nov: five lines, six
+answers; every line rewritten on its own, then the placing step). "Stray" = an answer's fact written into a line it
+was not given about, or a ticked tool in more than one line.
+- Live code (0374b3db), answers untagged, no placing step: 11 strays. "UX and product" in 5 of 5 lines, Google Sheets
+  in 5 of 5, "6–10 projects" on two lines it was not given about, "10–20 projects" on the wrong line. This is what the
+  owner saw.
+- First version (answers grouped, all still shown): 4 strays. Numbers right; "UX and product decisions" in 3 lines,
+  Google Sheets in 3.
+- Other lines' answers and role-topic answers no longer shown, tools shown with a rule: 1 to 3 strays over four runs,
+  all of them the ticked tool guessed into several lines. A rule did not hold; not showing it does.
+- Final (tools not shown to a line's writer, placed once by `use-answers`; the writer told what was already asked):
+  0 strays in 6 of 6 runs. Google Sheets on one line in 5 runs and on none in 1. No follow-up asked about tools again.
+What it costs: lines with no answer of their own are now often left as they are (2 of 5 in most runs), where the live
+code rewrote all five. The role's score rises less than before, as decision 4 said it would. About 22 model calls a
+run, a few cents in all.
+
+Notes:
+- Ruling (Task 6): `ROLE_TOPICS` moved from `enrich.ts` to `cv.ts` (the note schema needs it); nothing else changed
+  for its users. The budget drops an answered topic by filtering the role questions before `pickBudget`, so
+  `pickBudget` is untouched.
+- Ruling (Task 7): the role run's placing step sends the questions of all the role's enrichment notes (the last 20),
+  not only this run's, so an answer the path saved but never placed (the path was closed early) still lands.
+- Deploy order matters: the API first (it must accept the two new note fields), then the website.
+- Changes to auth, RLS, migrations: none. The stored CV gains two optional fields on a note; no migration.

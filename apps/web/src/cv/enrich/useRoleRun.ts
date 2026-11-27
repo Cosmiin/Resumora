@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  CLEAR_AT, MAX_LONG_TEXT, findScored, fingerprint, newId, notesHash,
+  CLEAR_AT, MAX_LONG_TEXT, answeredTopics, findScored, fingerprint, newId, notesHash,
   type CvContent, type Experience, type RoleResult,
 } from "@resumora/shared";
 import { ApiClientError } from "../../lib/api-error.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { roleListOf } from "../edit/lists.ts";
 import type { Via } from "./AnswerBox.tsx";
-import { brainDump, improveBullet, roleDescription, roleFacts, scoreRole } from "./enrich-api.ts";
+import { brainDump, improveBullet, placeAnswersOnCv, roleDescription, roleFacts, scoreRole } from "./enrich-api.ts";
 import { t } from "../../i18n/t.ts";
 import { RUN_MAX, buildRun, gapItems, itemQuestion, questionKey, splitRun, type RunItem } from "./run.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
-import { changeActions, type Change } from "./prepare.ts";
+import { changeActions, toChanges, withPlacedChanges, type Change } from "./prepare.ts";
 
 export type { Change };
 
@@ -62,7 +62,7 @@ function remaining(role: Experience | undefined, newest: RoleResult | undefined,
   if (!newest) return waiting;
   const followUps = waiting.filter((item) => item.kind === "line" && item.followUp);
   const taken = new Set([...asked, ...followUps.map((item) => questionKey(itemQuestion(item)))]);
-  return [...followUps, ...buildRun(newest, { thin: false, answered: taken })];
+  return [...followUps, ...buildRun(newest, { thin: false, answered: taken, known: role && answeredTopics(role) })];
 }
 
 /**
@@ -79,7 +79,7 @@ export function useRoleRun(opts: Options) {
     const result = role && entry?.state === "ready" && entry.result?.fingerprint === print ? entry.result : undefined;
     const asked = new Set(role?.notes.map((note) => questionKey(note.question)));
     const thin = isThin(role, result);
-    const run = splitRun(result ? buildRun(result, { thin, answered: asked }) : []);
+    const run = splitRun(result ? buildRun(result, { thin, answered: asked, known: role && answeredTopics(role) }) : []);
     // Below 100 with every stored question already answered: more are asked for, so the role can still be improved.
     const spent = result !== undefined && run.items.length === 0 && (result.score ?? 0) < 100;
     const view: View = {
@@ -159,7 +159,7 @@ export function useRoleRun(opts: Options) {
       s.result = result;
       s.printAtOpen = print;
       s.thin = isThin(role, result);
-      let all = buildRun(result, { thin: s.thin, answered: s.asked });
+      let all = buildRun(result, { thin: s.thin, answered: s.asked, known: role && answeredTopics(role) });
       const answers: View["answers"] = {};
       // Still below 80 and nothing new to ask: the app asks about what the page still does not show (a result, a
       // tool, a size), then the lines' own questions once more. An earlier answer comes back in its box to add to.
@@ -280,7 +280,7 @@ export function useRoleRun(opts: Options) {
     if (s.cursor < s.view.items.length) { show(s.cursor); return; }
     const now = findScored(current.current.cv, o.roleId)?.item;
     if (!now) return;
-    const changes: Change[] = [];
+    let changes: Change[] = [];
     if (description && squash(description) !== squash(now.description)) changes.push({ id: "description", kind: "description", before: now.description, after: description });
     for (const b of now.bullets) {
       const held = await s.held.get(b.id);
@@ -288,6 +288,17 @@ export function useRoleRun(opts: Options) {
       else if (held && held !== "none" && squash(held.text) !== squash(b.text)) changes.push({ id: `bullet:${b.id}`, kind: "bullet", bulletId: b.id, before: b.text, after: held.text });
     }
     for (const p of added) changes.push({ id: `new:${p.id}`, kind: "new", before: "", after: p.text });
+    // What the answers say that a line's rewrite does not take (a tool ticked for the whole role, the team, a free
+    // answer): placed once, by the step that sees the whole role (owner, 27 Nov 2026: one answer lands once).
+    const questions = now.notes.filter((n) => n.jobId === undefined).map((n) => n.question).slice(-20);
+    if (questions.length > 0 && (s.view.answered > 0 || fromEarlier)) {
+      const sent = toChanges(changes);
+      const placed = await saved((_, print) => placeAnswersOnCv({ roleId: o.roleId, fingerprint: print, changes: sent, questions }))
+        .then((a) => a?.changes ?? []).catch(() => []);
+      if (stale()) return;
+      if (s.cursor < s.view.items.length) { show(s.cursor); return; }
+      changes = withPlacedChanges(changes, sent, placed, now);
+    }
     if (stale()) return;
     if (changes.length) update({ busy: false, step: { kind: "approve", changes } });
     else if (failed) update({ busy: false, step: { kind: "failed" } });
@@ -314,7 +325,7 @@ export function useRoleRun(opts: Options) {
     if (fresh && role && fresh.fingerprint === fingerprint(role, o.cv.locale)) {
       s.result = fresh;
       const box = s.view.items.filter((item) => item.kind === "box");
-      update(splitRun([...box, ...buildRun(fresh, { thin: false, answered: s.asked })]));
+      update(splitRun([...box, ...buildRun(fresh, { thin: false, answered: s.asked, known: answeredTopics(role) })]));
     }
     next();
   }, [next, saved, update]);
@@ -378,6 +389,8 @@ export function useRoleRun(opts: Options) {
       s.notesChanged = true;
       o.dispatch({ type: "setNote", roleId: o.roleId, note: {
         id: noteId, question: itemQuestion(item), answer: value, via: via.length ? via : ["type"], askedAt: new Date().toISOString(),
+        // What the answer is about: its line, or the role topic, so it is used where it belongs and not asked again.
+        ...(item.kind === "line" ? { bulletId: item.question.bulletId } : item.kind === "role" ? { topic: item.question.topic } : {}),
       } });
       update({ answers: { ...s.view.answers, [item.key]: { noteId, text: value } }, answered: s.view.answered + 1 });
       // An answer about a line: its rewrite is prepared now and held. Only a first answer can bring a follow-up.
