@@ -448,6 +448,13 @@ describe("section pass", () => {
       expect(body.removed).toBe(0);
     });
 
+    it("a retried rename can't take the name a first-reply rename already has", async () => {
+      // "Kubernetes" is a tool no source has, so the first rename of Zapier is flagged and asked again.
+      replies = [proposals(rename("s1", "Workflow Automation Tools"), rename("s2", "Kubernetes")), { results: [] },
+        proposals(rename("s2", "workflow automation tools")), { results: [] }];
+      expect((await names()).proposals.map((p) => [p.itemId, p.text])).toEqual([["s1", "Workflow Automation Tools"]]);
+    });
+
     it("says so in the skills prompt", async () => {
       replies = [proposals()];
       await runSection("skills");

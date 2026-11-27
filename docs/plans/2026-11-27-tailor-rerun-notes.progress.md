@@ -17,3 +17,8 @@ Rulings:
 - **One more file.** `apps/api/src/tailor/questions.test.ts` holds the unit test of `acrossNote`, so the new null case went there (the brief named `test/tailor-questions.test.ts` only).
 - **The roles are not asked either.** The owner's words were about the tool. Without a tool's name nothing true can be written and nothing attaches to a role, so ticking roles would have had no effect.
 - The changed question screen was checked by its component test, not in a browser.
+
+## Whole-branch review — pass
+One low finding, fixed: the name check ran on each model reply on its own, so a retried rename could take the name a first-reply rename already had. It now also runs once over the final list, after the retry is merged in. The fix was reviewed on its own.
+
+cost: reviews 4 agents (one per task on Sonnet, the whole branch and the fix on Opus) · guard denials 0 · no real-AI runs.

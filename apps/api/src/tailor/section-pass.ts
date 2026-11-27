@@ -250,22 +250,9 @@ export async function passProposals(
     const kept: Proposal[] = [];
     const dropped: { itemId: string; field: string }[] = [];
     const unconfirmed: string[] = [];
-    // The skills step: the name each skill on the CV has, and the names this reply has already given.
-    const owners = new Map(section === "skills" ? [...cv.technicalSkills, ...cv.professionalSkills, ...cv.unclearSkills].map((s) => [sameSkill(s.name), s.id]) : []);
-    const given = new Set<string>();
-    const doubled: string[] = [];
     for (const { reason, guesses, ...p } of reply.proposals) {
       const fields = Object.keys(items.get(p.itemId)?.fields ?? {});
       const field = fields.includes(p.field) ? p.field : fields.length === 1 ? fields[0]! : null;
-      // Two skills never end with one name (27 Nov: three tools were each renamed "Workflow Automation Tools"): a rename
-      // to another skill's name, or to a name already given, is dropped and the skill keeps its own; so is a new skill
-      // the CV has or the reply already proposed.
-      if (section === "skills" && field && p.text.trim()) {
-        const name = sameSkill(p.text);
-        const owner = owners.get(name);
-        if (given.has(name) || (owner !== undefined && owner !== p.itemId)) { doubled.push(p.itemId); continue; }
-        given.add(name);
-      }
       // A guess or a new skill keeps the reason naming its basis; a plain rewording has none.
       const used = p.itemId === "new-skill" ? usedIn.get(p.text.trim().toLowerCase()) : undefined;
       const why = used ? { reason: used } : (p.inferred || p.itemId === "new-skill") && reason?.trim() ? { reason: reason.trim() } : {};
@@ -295,9 +282,29 @@ export async function passProposals(
       else if (!field) dropped.push({ itemId: p.itemId, field: p.field });
     }
     if (dropped.length) deps.log?.({ msg: "tailor proposals dropped", section, count: dropped.length, dropped });
-    if (doubled.length) deps.log?.({ msg: "tailor duplicate skills dropped", section, count: doubled.length, items: doubled });
     if (unconfirmed.length) deps.log?.({ msg: "tailor guesses dropped", section, count: unconfirmed.length, items: unconfirmed });
-    return kept;
+    return undoubled(kept);
+  }
+  // The skills step: the name each skill on the CV has.
+  const owners = new Map(section === "skills" ? [...cv.technicalSkills, ...cv.professionalSkills, ...cv.unclearSkills].map((s) => [sameSkill(s.name), s.id]) : []);
+  /**
+   * Two skills never end with one name (27 Nov: three tools were each renamed "Workflow Automation Tools"): a rename
+   * to another skill's name, or to a name an earlier proposal gives, is dropped and the skill keeps its own; so is a
+   * new skill the CV has or an earlier proposal gives. Run on each reply, and again once the retry is merged in.
+   */
+  function undoubled(list: Proposal[]): Proposal[] {
+    if (section !== "skills") return list;
+    const given = new Set<string>();
+    const doubled: string[] = [];
+    const single = list.filter((p) => {
+      const name = sameSkill(p.text);
+      const owner = owners.get(name);
+      if (given.has(name) || (owner !== undefined && owner !== p.itemId)) { doubled.push(p.itemId); return false; }
+      given.add(name);
+      return true;
+    });
+    if (doubled.length) deps.log?.({ msg: "tailor duplicate skills dropped", section, count: doubled.length, items: doubled });
+    return single;
   }
   async function check(all: Proposal[]): Promise<Proposal[]> {
     const proposals = all.filter((p) => !notText(p));
@@ -344,7 +351,7 @@ export async function passProposals(
     throw new ApiError(502, "ai_failed", `Couldn't tailor ${section}. Try again.`);
   }
 
-  const kept = proposals.filter((p) => p.flags.length === 0);
+  const kept = undoubled(proposals.filter((p) => p.flags.length === 0));
   // Proposals on flagged items that didn't come back clean from the retry, including ones the retry left out.
   const removed = Math.max(0, firstFlagged - kept.filter((p) => flagged.has(p.itemId)).length);
   // A project keeps at most two bullets: rewordings beyond the first two bullet texts are dropped (those bullets keep
