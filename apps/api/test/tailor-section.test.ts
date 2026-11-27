@@ -277,48 +277,42 @@ describe("section pass", () => {
     expect(system).toContain("field \\\"description\\\"");
   });
 
-  it("drops a proposal adding a tool no source mentions, whether or not it is marked inferred", async () => {
-    for (const inferred of [false, true]) {
-      const powerBi = reword("Ran payroll reporting for 40 staff in Power BI", { inferred, reason: inferred ? "Ran payroll for 40 staff" : null } as Partial<ModelProposal>);
-      replies = [proposals(powerBi), { results: [] }, proposals(powerBi), { results: [] }];
+  it("drops a proposal adding a tool no source mentions", async () => {
+    const powerBi = reword("Ran payroll reporting for 40 staff in Power BI");
+    replies = [proposals(powerBi), { results: [] }, proposals(powerBi), { results: [] }];
+    const body = await (await runSection()).res.json() as { proposals: Proposal[]; removed: number };
+    expect(body).toMatchObject({ proposals: [], removed: 1 });
+  });
+
+  it("writes nothing unconfirmed into a role: a line marked as a guess is dropped and logged without CV text", async () => {
+    const guesses = [
+      reword("Led payroll for 40 staff", { inferred: true }),
+      reword("Led payroll for 40 staff", { inferred: true, reason: "Ran payroll for 40 staff" }),
+      reword("Led payroll for 40 staff", { inferred: true, reason: "Ran payroll for 40 staff",
+        guesses: [{ text: "Led payroll", reason: "Your line says you ran payroll; it does not say you led it." }] }),
+    ];
+    for (const guess of guesses) {
+      log.mockClear();
+      replies = [proposals(guess, { ...reword("Ran payroll runs for 40 staff"), itemId: role.id, field: "description" })];
       const body = await (await runSection()).res.json() as { proposals: Proposal[]; removed: number };
-      expect(body).toMatchObject({ proposals: [], removed: 1 });
+      // The line keeps its Base wording; the plain rewording beside it stays; a dropped guess is no failed check.
+      expect(body.proposals.map((p) => p.itemId)).toEqual([role.id]);
+      expect(body.removed).toBe(0);
+      expect(log).toHaveBeenCalledWith({ msg: "tailor guesses dropped", section: "experience", count: 1, items: [bullet.id] });
+      expect(JSON.stringify(log.mock.calls)).not.toContain("Led payroll");
     }
   });
 
-  it("drops a guess without a reason and keeps a guess whose reason names its basis", async () => {
-    const bare = reword("Led payroll for 40 staff", { inferred: true });
-    replies = [proposals(bare), { results: [] }, proposals(bare), { results: [] }];
-    expect(await (await runSection()).res.json()).toMatchObject({ proposals: [], removed: 1 });
-    const based = reword("Led payroll for 40 staff", { inferred: true, reason: "Ran payroll for 40 staff" });
-    replies = [proposals(based), { results: [] }];
-    const body = await (await runSection()).res.json() as { proposals: Proposal[]; removed: number };
-    expect(body.removed).toBe(0);
-    expect(body.proposals).toEqual([expect.objectContaining({ text: "Led payroll for 40 staff", inferred: true, reason: "Ran payroll for 40 staff", flags: [] })]);
-  });
-
-  it("a guessed line keeps the phrases it guessed, each with its why; a phrase not in the line is left out", async () => {
-    const based = reword("Led payroll for 40 staff", { inferred: true, reason: "Ran payroll for 40 staff", guesses: [
-      { text: "Led payroll", reason: "Your line says you ran payroll; it does not say you led it." },
-      { text: "for 90 staff", reason: "Not in the line." },
-    ] });
-    replies = [proposals(based), { results: [] }];
-    const body = await (await runSection()).res.json() as { proposals: Proposal[] };
-    expect(body.proposals[0]).toMatchObject({ inferred: true,
-      inferredParts: [{ text: "Led payroll", reason: "Your line says you ran payroll; it does not say you led it." }] });
-    expect(body.proposals[0]!.guesses).toBeUndefined();
-  });
-
-  it("a phrase the person already confirmed is no guess; a line left with only such phrases is a plain rewording", async () => {
+  it("a phrase the person already confirmed is no guess: the line is a plain rewording; any other guessed phrase drops it", async () => {
     const note = (answer: string) => ({ id: "n1", question: "Did you use knowledge management systems?", answer, via: ["pick" as const], askedAt: "2026-11-10T10:00:00Z" });
     const line = "Ran payroll for 40 staff and kept knowledge management systems up to date for lifecycle events";
     const kms = { text: "knowledge management systems", reason: "You confirmed experience with knowledge management systems." };
     const events = { text: "lifecycle events", reason: "The job asks for it." };
     await cv.save({ ...base, experience: [{ ...role, notes: [note("Yes, in Confluence")] }] }, 1);
 
-    replies = [proposals(reword(line, { inferred: true, reason: "From your answer", guesses: [kms, events] })), { results: [] }];
+    replies = [proposals(reword(line, { inferred: true, reason: "From your answer", guesses: [kms, events] }))];
     let body = await (await runSection()).res.json() as { proposals: Proposal[] };
-    expect(body.proposals[0]).toMatchObject({ inferred: true, inferredParts: [events] });
+    expect(body.proposals).toEqual([]);
 
     replies = [proposals(reword(line.replace(" for lifecycle events", ""), { inferred: true, reason: "From your answer", guesses: [kms] })), { results: [] }];
     body = await (await runSection()).res.json() as { proposals: Proposal[] };
@@ -326,11 +320,39 @@ describe("section pass", () => {
     expect(body.proposals[0]!.inferredParts).toBeUndefined();
     expect(body.proposals[0]!.reason).toBeUndefined();
 
+    // A guess the model lists but the line does not hold word for word can't be checked: the line is dropped too.
+    replies = [proposals(reword(line.replace(" for lifecycle events", ""), { inferred: true, reason: "From your answer",
+      guesses: [kms, { text: "kept everything current", reason: "Reworded from the line." }] }))];
+    body = await (await runSection()).res.json() as { proposals: Proposal[] };
+    expect(body.proposals).toEqual([]);
+
     // A "No" confirms nothing.
     await cv.save({ ...base, experience: [{ ...role, notes: [note("No")] }] }, 2);
-    replies = [proposals(reword(line.replace(" for lifecycle events", ""), { inferred: true, reason: "From your answer", guesses: [kms] })), { results: [] }];
+    replies = [proposals(reword(line.replace(" for lifecycle events", ""), { inferred: true, reason: "From your answer", guesses: [kms] }))];
     body = await (await runSection()).res.json() as { proposals: Proposal[] };
-    expect(body.proposals[0]).toMatchObject({ inferred: true, inferredParts: [kms] });
+    expect(body.proposals).toEqual([]);
+  });
+
+  it("an answer confirms a guessed phrase whatever the verb form", async () => {
+    const start = await (await post(`/v1/jobs/${jobId}/tailor`, { tone: "formal" })).json() as { run: { id: string } };
+    const question: TailorQuestion = { id: "q-sop", roleId: role.id, section: "experience", kind: "confirm_inferred", options: [], reason: "Gap",
+      text: "Did you also maintain the standard operating procedures for payroll?" };
+    await memoryTailorRepo("user-a", scores, docs).updateRun(start.run.id, { questions: [question], answers: [{ questionId: "q-sop", value: "Yes", via: "option" }] });
+    const line = "Ran payroll for 40 staff and maintained standard operating procedures";
+    replies = [proposals(reword(line, { inferred: true, reason: "From your answer",
+      guesses: [{ text: "maintained standard operating procedures", reason: "You said you maintained them." }] })), { results: [] }];
+    const body = await (await post(`/v1/tailor-runs/${start.run.id}/sections/experience/run`, { roleId: role.id })).json() as { proposals: Proposal[] };
+    expect(body.proposals).toEqual([{ itemId: bullet.id, field: "text", text: line, inferred: false, flags: [] }]);
+  });
+
+  it("tells a role step that nothing is inferred there, and leaves the summary its guesses", async () => {
+    replies = [proposals()];
+    await runSection();
+    expect(JSON.stringify(model.requests[0])).toContain("Nothing unconfirmed goes into a role, a project or a volunteering role");
+    model.requests.length = 0;
+    replies = [proposals()];
+    await runSection("summary");
+    expect(JSON.stringify(model.requests[0])).not.toContain("Nothing unconfirmed goes into a role");
   });
 
   it("states the truth rule in the section prompt", async () => {

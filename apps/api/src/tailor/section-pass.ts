@@ -106,8 +106,28 @@ export const notText = (p: Pick<Proposal, "field">) => p.field === "hidden" || p
 /** An answer that says no ("No", "Nu", "Never") confirms nothing. */
 const NEGATIVE = /^\s*(no|nu|not|never|none|nope|niciodat|n-am)\b/i;
 const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
-/** Singular and plural count as one word: "systems" is "system". */
-const stem = (word: string) => word.replace(/(ies|es|s)$/, "");
+/** One ending off a word, or the word itself when nothing more comes off. Never below three letters. */
+function fold(word: string): string {
+  if (word.length <= 3) return word;
+  if (word.length > 4 && /(ies|ied)$/.test(word)) return `${word.slice(0, -3)}y`;
+  for (const ending of ["ing", "ed"]) {
+    // "planned" and "planning" are "plan": the doubled consonant goes with the ending.
+    if (word.endsWith(ending) && word.length - ending.length >= 3) return word.slice(0, -ending.length).replace(/([bdgmnprt])\1$/, "$1");
+  }
+  if (word.endsWith("ed")) return word.slice(0, -1);
+  if (word.endsWith("es") && word.length >= 5) return word.slice(0, -2);
+  if (/[^s]s$/.test(word) || word.endsWith("e")) return word.slice(0, -1);
+  return word;
+}
+/**
+ * Plurals and verb forms count as one word: "systems" is "system", and "maintained", "maintaining" and "maintains"
+ * are "maintain" (27 Nov: an answer to "Did you also maintain…?" did not confirm "maintained…" on the line).
+ */
+function stem(word: string): string {
+  let folded = fold(word);
+  while (folded !== word) { word = folded; folded = fold(word); }
+  return folded;
+}
 /** True when every word of 3 letters or more in `phrase` stands in one of the texts. */
 export function confirmedIn(phrase: string, texts: string[]): boolean {
   const needed = words(phrase).filter((w) => w.length >= 3).map(stem);
@@ -218,6 +238,7 @@ export async function passProposals(
     // or fields are dropped and logged (ids and fields only); items without a proposal keep the Base CV wording.
     const kept: Proposal[] = [];
     const dropped: { itemId: string; field: string }[] = [];
+    const unconfirmed: string[] = [];
     for (const { reason, guesses, ...p } of reply.proposals) {
       const fields = Object.keys(items.get(p.itemId)?.fields ?? {});
       const field = fields.includes(p.field) ? p.field : fields.length === 1 ? fields[0]! : null;
@@ -239,12 +260,18 @@ export async function passProposals(
       // An order that changes nothing is no change, so a section with nothing else passes with a tick.
       const same = (a: string) => a.split(",").map((id) => id.trim()).join(",");
       if (p.itemId === "order" && field && same(p.text) === same(items.get("order")!.fields.order ?? "")) continue;
+      // Nothing unconfirmed goes into a role, a project or a volunteering role: a line with a guess the person has not
+      // confirmed keeps its Base wording. So does a line with a listed guess that isn't in it word for word (it can't
+      // be checked). What is missing as a fact is asked by the questions.
+      const checked = settled && parts.length === (guesses ?? []).length;
+      if (isRoleSection(section) && field && p.inferred && !checked) { unconfirmed.push(p.itemId); continue; }
       // A hide or an order is never a guess: it names no fact, and the person decides it on the screen.
       if (field && p.text.trim() && notText({ field })) kept.push({ ...p, field, text: p.text.trim(), inferred: false, flags: [] });
       else if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [], ...(settled && !used ? {} : why), ...guessed, ...partly });
       else if (!field) dropped.push({ itemId: p.itemId, field: p.field });
     }
     if (dropped.length) deps.log?.({ msg: "tailor proposals dropped", section, count: dropped.length, dropped });
+    if (unconfirmed.length) deps.log?.({ msg: "tailor guesses dropped", section, count: unconfirmed.length, items: unconfirmed });
     return kept;
   }
   async function check(all: Proposal[]): Promise<Proposal[]> {
